@@ -1,0 +1,9 @@
+node_modules/
+.next/
+*.tsbuildinfo
+data/
+drizzle/meta/_journal.json
+drizzle/*.sqlite
+drizzle/*.db
+.env*
+!.env.example
