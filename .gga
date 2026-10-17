@@ -1,4 +1,5 @@
 PROVIDER=opencode
+OPENCODE_AGENT=gga-reviewer
 FILE_PATTERNS=*.ts,*.tsx,*.js,*.jsx
 EXCLUDE_PATTERNS=*.d.ts,dist/*,build/*,node_modules/*
 RULES_FILE=AGENTS.md
