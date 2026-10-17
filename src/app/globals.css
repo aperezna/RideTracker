@@ -2,12 +2,12 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  color-scheme: light;
-}
+:root { color-scheme: dark; }
 
 body {
   margin: 0;
-  background: #f8fafc;
-  color: #0f172a;
+  background: #0f131d;
+  color: #dfe2f1;
 }
+
+.leaflet-container { background: #0a0e18; font-family: inherit; }
