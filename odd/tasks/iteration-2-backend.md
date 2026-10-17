@@ -35,9 +35,9 @@ Test runner: `npm run typecheck`, `npm run lint`, `npm run test`
 
 ## Tasks
 
-- T1 — S1-S2 — inline — pending — no commit
-- T2 — S3-S5 — inline — pending — no commit
-- T3 — S6 — delegated verifier + inline delivery — pending — no commit
+- T1 — S1-S2 — inline — completed — commit `03d4065`
+- T2 — S3-S5 — inline — completed — commit `03d4065`
+- T3 — S6 — delegated verifier + inline delivery — completed — commit `03d4065`
 
 ## Log
 
@@ -53,3 +53,4 @@ Test runner: `npm run typecheck`, `npm run lint`, `npm run test`
 4. VERIFICACIÓN Y GGA: Ejecuta `npm run typecheck`, `npm run lint` y `npm run test`. Pasa `gga` y crea el commit `feat(backend): hybrid park importer, server actions and single-user auth`.
 5. ENGRAM CHECKPOINT: Guarda en Engram el cierre de la Iteración 2 y las firmas de las Server Actions creadas."
 - L2 — Context7 verified Next.js 15 async `cookies()`, Server Actions with `'use server'`, `revalidatePath`, middleware matchers, and Zod `z.object`/`z.enum`/`safeParse` patterns.
+- L3 — Implementation completed in commit `03d4065`; verifier recheck passed; `npm run typecheck`, `npm run lint`, `npm run test` (10 tests), and GGA passed.
