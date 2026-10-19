@@ -7,3 +7,4 @@ drizzle/*.sqlite
 drizzle/*.db
 .env*
 !.env.example
+.atl/
