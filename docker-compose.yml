@@ -1,0 +1,15 @@
+services:
+  ridetracker:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: ridetracker:latest
+    ports:
+      - "3000:3000"
+    environment:
+      APP_MASTER_PASSWORD: ${APP_MASTER_PASSWORD:?APP_MASTER_PASSWORD must be set}
+      DATABASE_URL: /app/data/coastervault.db
+      NODE_ENV: production
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped

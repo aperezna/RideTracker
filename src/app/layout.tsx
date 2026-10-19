@@ -4,6 +4,8 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "RideTracker",
   description: "Personal theme park and ride tracker",
+  applicationName: "RideTracker",
+  appleWebApp: { capable: true, title: "RideTracker", statusBarStyle: "black-translucent" },
 };
 
 export default function RootLayout({ children }: Readonly<{ children: React.ReactNode }>) {
