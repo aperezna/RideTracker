@@ -18,15 +18,18 @@ const externalParkSchema = z.object({
   name: z.string(),
   country: z.string().optional(),
   city: z.string().optional(),
-  latitude: z.number().optional(),
-  longitude: z.number().optional(),
+  latitude: z.coerce.number().optional(),
+  longitude: z.coerce.number().optional(),
   rides: z.array(externalRideSchema).optional(),
 });
 
-const parksResponseSchema = z.object({
-  parks: z.array(externalParkSchema).optional(),
-  continents: z.array(z.object({ parks: z.array(externalParkSchema).optional() })).optional(),
-});
+const parksResponseSchema = z.union([
+  z.object({
+    parks: z.array(externalParkSchema).optional(),
+    continents: z.array(z.object({ parks: z.array(externalParkSchema).optional() })).optional(),
+  }),
+  z.array(z.object({ parks: z.array(externalParkSchema).optional() })),
+]);
 
 const queueTimesDetailSchema = z.object({
   rides: z.array(externalRideSchema).optional(),
@@ -101,7 +104,9 @@ export async function searchExternalParks(
   baseUrl = process.env.QUEUE_TIMES_BASE_URL ?? DEFAULT_BASE_URL,
 ): Promise<ImportedPark[]> {
   const data = parksResponseSchema.parse(await fetchJson(`${baseUrl.replace(/\/$/, "")}/parks.json`, fetchImpl));
-  const parks = [...(data.parks ?? []), ...(data.continents ?? []).flatMap((continent) => continent.parks ?? [])];
+  const parks = Array.isArray(data)
+    ? data.flatMap((continent) => continent.parks ?? [])
+    : [...(data.parks ?? []), ...(data.continents ?? []).flatMap((continent) => continent.parks ?? [])];
   const normalizedQuery = query.trim().toLowerCase();
   return parks.filter((park) => park.name.toLowerCase().includes(normalizedQuery)).map(normalizePark);
 }

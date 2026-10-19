@@ -14,9 +14,9 @@ export async function middleware(request: NextRequest) {
   if (request.nextUrl.pathname.startsWith("/api/")) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
-  return NextResponse.redirect(new URL("/api/auth/login", request.url));
+  return NextResponse.redirect(new URL("/login", request.url));
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|api/auth/login).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|login|api/auth/login).*)"],
 };

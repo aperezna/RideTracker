@@ -14,8 +14,8 @@ export default function LeafletParksMap({ parks }: LeafletParksMapProps) {
   return (
     <MapContainer center={[30, 10]} zoom={2} minZoom={2} scrollWheelZoom className="h-72 w-full">
       <TileLayer
-        attribution="&copy; OpenStreetMap contributors &copy; CARTO"
-        url="https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png"
+        attribution="&copy; OpenStreetMap contributors"
+        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
       {parks.map((park) => (
         <CircleMarker
