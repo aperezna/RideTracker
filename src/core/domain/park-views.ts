@@ -18,6 +18,7 @@ export type RideInventoryData = {
   rating: number | null;
   preferredRow: string | null;
   totalLaps: number;
+  totalTrips: number;
 };
 
 export type VisitHistoryData = {

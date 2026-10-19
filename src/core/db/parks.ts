@@ -31,10 +31,12 @@ export function getParkDetailData(parkId: string): ParkDetailData | null {
     .from(rideLogs)
     .all();
   const lapsByRide = new Map<string, number>();
+  const tripsByRide = new Map<string, number>();
   const lapsByVisit = new Map<string, number>();
   const ridesByVisit = new Map<string, number>();
   for (const log of logs) {
     lapsByRide.set(log.rideId, (lapsByRide.get(log.rideId) ?? 0) + log.lapCount);
+    tripsByRide.set(log.rideId, (tripsByRide.get(log.rideId) ?? 0) + 1);
     lapsByVisit.set(log.visitDayId, (lapsByVisit.get(log.visitDayId) ?? 0) + log.lapCount);
     ridesByVisit.set(log.visitDayId, (ridesByVisit.get(log.visitDayId) ?? 0) + 1);
   }
@@ -58,6 +60,7 @@ export function getParkDetailData(parkId: string): ParkDetailData | null {
       rating: ride.rating,
       preferredRow: ride.preferredRow,
       totalLaps: lapsByRide.get(ride.id) ?? 0,
+      totalTrips: tripsByRide.get(ride.id) ?? 0,
     })),
     visits: visitRows.map((visit) => ({
       id: visit.id,

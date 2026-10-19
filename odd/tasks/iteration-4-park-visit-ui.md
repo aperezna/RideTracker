@@ -39,7 +39,7 @@ Forecast: above the default ~400 authored-line review slice; use chained commits
 - T1 — S1-S2 — inline — done — catalog list, filters, hybrid search, manual creation; checks green; commit pending.
 - T2 — S3 — inline — done — park detail data boundary and presentation components; checks green; commit pending.
 - T3 — S4 — inline — done — mobile visit header, optimistic check-in, rating sheet; checks green; commit pending.
-- T4 — S5 — delegated verifier — pending — RDD boundary and required field audit.
+- T4 — S5 — delegated verifier — done — boundary passed; S3 blocker fixed and bounded recheck passed.
 - T5 — S6 — inline — pending — checks, GGA, checkpoint, and requested commit.
 
 ## Log
@@ -65,6 +65,7 @@ Forecast: above the default ~400 authored-line review slice; use chained commits
 - L5 — T1 implementation evidence: `src/app/parks/page.tsx` now provides the server boundary; `ParksCatalog`, `ParksFilterBar`, `ParkCardGrid`, and `HybridParkSearchModal` provide typed presentational/client behavior; Queue-Times import and manual creation use existing Server Actions; `npm run typecheck`, `npm run lint`, and `npm run test` (18/18) pass.
 - L6 — T2 implementation evidence: `src/app/parks/[id]/page.tsx` provides the Server Component boundary; `ParkHeroHeader`, `RideInventoryTable`, and `VisitHistoryTimeline` render status, `tripNotes`, `preferredRow`, `rating`, historical laps, visit dates, and visit notes; `npm run typecheck`, `npm run lint`, and `npm run test` (18/18) pass after replacing raw navigation with `next/link`.
 - L7 — T3 implementation evidence: `src/app/visits/[id]/page.tsx` provides the Server Component boundary; `VisitDayHeader` edits day notes, `QuickRideCheckinCard` uses React 19 `useOptimistic` inside transitions for lap controls and check-ins, and `RideRatingSheet` provides rating, preferred-row chips, and notes; `npm run typecheck`, `npm run lint`, and `npm run test` (18/18) pass.
+- L8 — T4 verification evidence: independent verifier found no direct `db` imports or `fetch()` calls under `src/components/features/**`; it initially found that UI-03 showed laps but not historical trip count. Correction added `totalTrips` from ride-log entries alongside `totalLaps`; bounded recheck passed with typecheck, lint, and tests still green.
 
 ## Risk
 
