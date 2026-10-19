@@ -37,7 +37,7 @@ Forecast: above the default ~400 authored-line review slice; use chained commits
 ## Tasks
 
 - T1 — S1-S2 — inline — done — catalog list, filters, hybrid search, manual creation; checks green; commit pending.
-- T2 — S3 — inline after delivery strategy decision — pending — park detail data boundary and presentation components.
+- T2 — S3 — inline — done — park detail data boundary and presentation components; checks green; commit pending.
 - T3 — S4 — inline after delivery strategy decision — pending — mobile visit header, optimistic check-in, rating sheet.
 - T4 — S5 — delegated verifier — pending — RDD boundary and required field audit.
 - T5 — S6 — inline — pending — checks, GGA, checkpoint, and requested commit.
@@ -63,6 +63,7 @@ Forecast: above the default ~400 authored-line review slice; use chained commits
 - L3 — RDD mode status: enabled globally; no candidate review consent has been started.
 - L4 — User decision (2026-10-19): "commits encadenados". Use chained commits by independent behavior instead of a single oversized commit.
 - L5 — T1 implementation evidence: `src/app/parks/page.tsx` now provides the server boundary; `ParksCatalog`, `ParksFilterBar`, `ParkCardGrid`, and `HybridParkSearchModal` provide typed presentational/client behavior; Queue-Times import and manual creation use existing Server Actions; `npm run typecheck`, `npm run lint`, and `npm run test` (18/18) pass.
+- L6 — T2 implementation evidence: `src/app/parks/[id]/page.tsx` provides the Server Component boundary; `ParkHeroHeader`, `RideInventoryTable`, and `VisitHistoryTimeline` render status, `tripNotes`, `preferredRow`, `rating`, historical laps, visit dates, and visit notes; `npm run typecheck`, `npm run lint`, and `npm run test` (18/18) pass after replacing raw navigation with `next/link`.
 
 ## Risk
 

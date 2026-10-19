@@ -63,6 +63,8 @@ export async function updateParkTripNotes(parkId: string, tripNotes: string): Pr
   await requireSession();
   updateParkNotesRecord(parkId, tripNotes);
   revalidatePath("/");
+  revalidatePath("/parks");
+  revalidatePath(`/parks/${parkId}`);
 }
 
 export async function updateParkStatus(parkId: string, status: "WISHLIST" | "PLANNED" | "VISITED"): Promise<void> {

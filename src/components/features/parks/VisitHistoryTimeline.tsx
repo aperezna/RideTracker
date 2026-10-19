@@ -1,0 +1,5 @@
+import type { VisitHistoryData } from "@/core/domain/park-views";
+
+export function VisitHistoryTimeline({ visits }: { visits: VisitHistoryData[] }) {
+  return <section className="rounded-2xl border border-slate-800 bg-slate-900/70 p-5"><p className="text-xs font-semibold uppercase tracking-[0.18em] text-emerald-300">Timeline</p><h2 className="mt-1 text-xl font-bold">Visit history</h2><div className="mt-5 space-y-4">{visits.map((visit) => <article key={visit.id} className="relative border-l border-emerald-400/30 pl-5"><span className="absolute -left-[5px] top-1 h-2 w-2 rounded-full bg-emerald-300" /><div className="flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold text-slate-100">{visit.visitDate}</h3><span className="text-xs text-slate-500">{visit.rideCount} check-ins · {visit.totalLaps} laps</span></div><p className="mt-2 text-sm leading-6 text-slate-400">{visit.tripNotes || "No notes recorded for this day."}</p></article>)}{visits.length === 0 && <p className="text-sm text-slate-400">No visit days recorded yet.</p>}</div></section>;
+}
