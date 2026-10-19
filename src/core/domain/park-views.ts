@@ -35,3 +35,24 @@ export type ParkDetailData = ParkCardData & {
   rides: RideInventoryData[];
   visits: VisitHistoryData[];
 };
+
+export type VisitRideData = {
+  id: string;
+  name: string;
+  category: RideCategory;
+  preferredRow: string | null;
+  rating: number | null;
+  lapCount: number;
+  checkInCount: number;
+};
+
+export type VisitDayData = {
+  id: string;
+  parkId: string;
+  parkName: string;
+  city: string;
+  country: string;
+  visitDate: string;
+  tripNotes: string | null;
+  rides: VisitRideData[];
+};

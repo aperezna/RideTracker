@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
-import { createVisitDayRecord } from "@/core/db/repositories";
+import { createVisitDayRecord, updateVisitDayNotesRecord } from "@/core/db/repositories";
 import { visitDaySchema } from "@/core/validators/visit-day.schema";
 import { isValidSessionToken, SESSION_COOKIE_NAME } from "@/core/auth/session";
 
@@ -18,4 +18,11 @@ export async function recordVisitDay(input: unknown): Promise<string> {
   createVisitDayRecord({ ...visit, id, createdAt: new Date() });
   revalidatePath(`/parks/${visit.parkId}`);
   return id;
+}
+
+export async function updateVisitDayNotes(visitDayId: string, tripNotes: string): Promise<void> {
+  await requireSession();
+  updateVisitDayNotesRecord(visitDayId, tripNotes);
+  revalidatePath(`/visits/${visitDayId}`);
+  revalidatePath("/parks");
 }
