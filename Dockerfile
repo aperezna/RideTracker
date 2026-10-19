@@ -1,5 +1,6 @@
 FROM node:22-alpine AS dependencies
 WORKDIR /app
+RUN apk add --no-cache python3 make g++
 COPY package.json package-lock.json ./
 RUN npm ci
 
@@ -17,11 +18,16 @@ ENV NODE_ENV=production \
     HOSTNAME=0.0.0.0 \
     PORT=3000 \
     DATABASE_URL=/app/data/coastervault.db
-RUN addgroup --system --gid 1001 nodejs && adduser --system --uid 1001 ridetracker
-COPY --from=builder --chown=ridetracker:nodejs /app/public ./public
-COPY --from=builder --chown=ridetracker:nodejs /app/.next/standalone ./
-COPY --from=builder --chown=ridetracker:nodejs /app/.next/static ./.next/static
-RUN mkdir -p /app/data && chown ridetracker:nodejs /app/data
-USER ridetracker
+RUN apk add --no-cache su-exec \
+    && addgroup --system --gid 1001 nodejs \
+    && adduser --system --uid 1001 nextjs
+COPY --from=builder --chown=nextjs:nodejs /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY docker-entrypoint.sh /usr/local/bin/docker-entrypoint.sh
+RUN chmod +x /usr/local/bin/docker-entrypoint.sh \
+    && mkdir -p /app/data \
+    && chown -R nextjs:nodejs /app/data
 EXPOSE 3000
+ENTRYPOINT ["/usr/local/bin/docker-entrypoint.sh"]
 CMD ["node", "server.js"]
