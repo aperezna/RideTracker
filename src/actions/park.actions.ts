@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
-import { createParkRecord, importParkRecord, updateParkNotesRecord } from "@/core/db/repositories";
+import { createParkRecord, importParkRecord, updateParkNotesRecord, updateParkStatusRecord } from "@/core/db/repositories";
 import { getExternalPark, searchExternalParks, type ImportedPark } from "@/core/services/queue-times.service";
 import { parkSchema } from "@/core/validators/park.schema";
 
@@ -63,4 +63,12 @@ export async function updateParkTripNotes(parkId: string, tripNotes: string): Pr
   await requireSession();
   updateParkNotesRecord(parkId, tripNotes);
   revalidatePath("/");
+}
+
+export async function updateParkStatus(parkId: string, status: "WISHLIST" | "PLANNED" | "VISITED"): Promise<void> {
+  await requireSession();
+  updateParkStatusRecord(parkId, status);
+  revalidatePath("/");
+  revalidatePath("/parks");
+  revalidatePath(`/parks/${parkId}`);
 }

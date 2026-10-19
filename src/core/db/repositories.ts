@@ -25,6 +25,10 @@ export function updateParkNotesRecord(parkId: string, tripNotes: string): void {
   db.update(parks).set({ tripNotes }).where(eq(parks.id, parkId)).run();
 }
 
+export function updateParkStatusRecord(parkId: string, status: typeof parks.$inferInsert.status): void {
+  db.update(parks).set({ status }).where(eq(parks.id, parkId)).run();
+}
+
 export function createRideRecord(ride: RideRecord): void {
   if (!db.select({ id: parks.id }).from(parks).where(eq(parks.id, ride.parkId)).get()) throw new Error("Park not found");
   db.insert(rides).values(ride).run();
