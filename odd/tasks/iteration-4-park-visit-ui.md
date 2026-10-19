@@ -40,7 +40,7 @@ Forecast: above the default ~400 authored-line review slice; use chained commits
 - T2 — S3 — inline — done — park detail data boundary and presentation components; checks green; commit pending.
 - T3 — S4 — inline — done — mobile visit header, optimistic check-in, rating sheet; checks green; commit pending.
 - T4 — S5 — delegated verifier — done — boundary passed; S3 blocker fixed and bounded recheck passed.
-- T5 — S6 — inline — pending — checks, GGA, checkpoint, and requested commit.
+- T5 — S6 — inline — done — typecheck, lint, tests, build, GGA, checkpoint, and final commit complete.
 
 ## Log
 
@@ -66,6 +66,7 @@ Forecast: above the default ~400 authored-line review slice; use chained commits
 - L6 — T2 implementation evidence: `src/app/parks/[id]/page.tsx` provides the Server Component boundary; `ParkHeroHeader`, `RideInventoryTable`, and `VisitHistoryTimeline` render status, `tripNotes`, `preferredRow`, `rating`, historical laps, visit dates, and visit notes; `npm run typecheck`, `npm run lint`, and `npm run test` (18/18) pass after replacing raw navigation with `next/link`.
 - L7 — T3 implementation evidence: `src/app/visits/[id]/page.tsx` provides the Server Component boundary; `VisitDayHeader` edits day notes, `QuickRideCheckinCard` uses React 19 `useOptimistic` inside transitions for lap controls and check-ins, and `RideRatingSheet` provides rating, preferred-row chips, and notes; `npm run typecheck`, `npm run lint`, and `npm run test` (18/18) pass.
 - L8 — T4 verification evidence: independent verifier found no direct `db` imports or `fetch()` calls under `src/components/features/**`; it initially found that UI-03 showed laps but not historical trip count. Correction added `totalTrips` from ride-log entries alongside `totalLaps`; bounded recheck passed with typecheck, lint, and tests still green.
+- L9 — T5 evidence: `npm run typecheck`, `npm run lint`, `npm run test` (18/18), and `npm run build` pass; native RDD review approved and acknowledged with three lenses; `gga run --ci --no-cache` returned `STATUS: PASSED`; commits are chained and the final requested commit closes the iteration.
 
 ## Risk
 
