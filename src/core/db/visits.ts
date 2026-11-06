@@ -33,6 +33,7 @@ export function getVisitDayData(visitDayId: string): VisitDayData | null {
       rating: ride.rating,
       lapCount: lapsByRide.get(ride.id) ?? 0,
       checkInCount: checkInsByRide.get(ride.id) ?? 0,
+      reviewNotes: ride.reviewNotes,
     })),
   };
 }

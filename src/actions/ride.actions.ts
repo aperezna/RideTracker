@@ -19,6 +19,7 @@ export async function recordRideCheckIn(input: unknown): Promise<string> {
   const id = crypto.randomUUID();
   createRideLogRecord({ ...log, id });
   revalidatePath("/");
+  revalidatePath(`/visits/${log.visitDayId}`);
   return id;
 }
 
@@ -34,6 +35,7 @@ export async function createRide(input: unknown): Promise<string> {
 export async function updateRideRating(input: unknown): Promise<void> {
   await requireSession();
   const rating = rideRatingSchema.parse(input);
-  updateRideRatingRecord(rating.rideId, rating.rating, rating.preferredRow, rating.reviewNotes);
+  const parkId = updateRideRatingRecord(rating.rideId, rating.rating, rating.preferredRow, rating.reviewNotes);
   revalidatePath("/");
+  if (parkId) revalidatePath(`/parks/${parkId}`);
 }

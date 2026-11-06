@@ -2,8 +2,9 @@
 
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
-import { createParkRecord, importParkRecord, updateParkNotesRecord, updateParkStatusRecord } from "@/core/db/repositories";
+import { createParkRecord, importParkRecord, updateRideManufacturerRecord, updateParkNotesRecord, updateParkStatusRecord } from "@/core/db/repositories";
 import { getExternalPark, searchExternalParks, type ImportedPark } from "@/core/services/queue-times.service";
+import { getWikipediaManufacturer } from "@/core/services/wikimedia.service";
 import { parkSchema } from "@/core/validators/park.schema";
 
 import { isValidSessionToken, SESSION_COOKIE_NAME } from "@/core/auth/session";
@@ -26,6 +27,27 @@ function importedParkValues(park: ImportedPark) {
     tripNotes: "",
     createdAt: new Date(),
   };
+}
+
+export async function refreshParkCatalog(externalId: string): Promise<void> {
+  await requireSession();
+  const park = await getExternalPark(externalId);
+  const storedParkId = `external-${park.externalId}`;
+  importParkRecord(importedParkValues(park), park.rides.map((ride) => ({
+    id: `${storedParkId}-ride-${ride.externalId}`,
+    parkId: storedParkId,
+    externalId: ride.externalId,
+    name: ride.name,
+    category: ride.category,
+    manufacturer: ride.manufacturer,
+  })));
+  for (const ride of park.rides) {
+    if (!ride.manufacturer) {
+      const manufacturer = await getWikipediaManufacturer(ride.name);
+      if (manufacturer) updateRideManufacturerRecord(`${storedParkId}-ride-${ride.externalId}`, manufacturer);
+    }
+  }
+  revalidatePath(`/parks/${storedParkId}`);
 }
 
 export async function searchParks(query: string): Promise<ImportedPark[]> {

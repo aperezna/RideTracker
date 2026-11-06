@@ -1,10 +1,13 @@
 import type { MetadataRoute } from "next";
+import { getRequestLocale } from "@/core/i18n/server";
+import { translate } from "@/core/i18n/translations";
 
-export default function manifest(): MetadataRoute.Manifest {
+export default async function manifest(): Promise<MetadataRoute.Manifest> {
+  const locale = await getRequestLocale();
   return {
-    name: "RideTracker — Theme Park & Ride Tracker",
+    name: translate(locale, "metadata.manifestName"),
     short_name: "RideTracker",
-    description: "Track theme parks, ride check-ins, laps, ratings, and visit notes.",
+    description: translate(locale, "metadata.manifestDescription"),
     start_url: "/",
     scope: "/",
     display: "standalone",

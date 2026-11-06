@@ -12,6 +12,7 @@ export type ParkCardData = {
 
 export type RideInventoryData = {
   id: string;
+  externalId: string | null;
   name: string;
   category: RideCategory;
   manufacturer: string;
@@ -19,6 +20,15 @@ export type RideInventoryData = {
   preferredRow: string | null;
   totalLaps: number;
   totalTrips: number;
+};
+
+export type RideDetailData = RideInventoryData & {
+  parkId: string;
+  parkName: string;
+  parkCountry: string;
+  parkCity: string;
+  externalId: string | null;
+  reviewNotes: string | null;
 };
 
 export type VisitHistoryData = {
@@ -45,6 +55,7 @@ export type VisitRideData = {
   rating: number | null;
   lapCount: number;
   checkInCount: number;
+  reviewNotes: string | null;
 };
 
 export type VisitDayData = {

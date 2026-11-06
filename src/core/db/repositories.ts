@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 
 import { db } from "./index";
 import { parks, rideLogs, rides, visitDays } from "./schema";
@@ -13,7 +13,16 @@ type RideLogRecord = typeof rideLogs.$inferInsert;
 export function importParkRecord(park: ParkRecord, importedRides: RideRecord[]): void {
   db.transaction((transaction) => {
     transaction.insert(parks).values(park).onConflictDoNothing().run();
-    for (const ride of importedRides) transaction.insert(rides).values(ride).onConflictDoNothing().run();
+     for (const ride of importedRides) {
+       transaction.insert(rides).values(ride).onConflictDoUpdate({
+         target: rides.id,
+         set: {
+           name: sql`excluded.name`,
+           category: sql`excluded.category`,
+           manufacturer: sql`CASE WHEN excluded.manufacturer <> '' THEN excluded.manufacturer ELSE rides.manufacturer END`,
+         },
+       }).run();
+     }
   });
 }
 
@@ -54,8 +63,13 @@ export function createRideLogRecord(log: RideLogRecord): void {
   db.insert(rideLogs).values(log).run();
 }
 
-export function updateRideRatingRecord(rideId: string, rating: number, preferredRow: string | null | undefined, reviewNotes: string | null | undefined): void {
+export function updateRideRatingRecord(rideId: string, rating: number, preferredRow: string | null | undefined, reviewNotes: string | null | undefined): string | undefined {
   db.update(rides).set({ rating, preferredRow, reviewNotes }).where(eq(rides.id, rideId)).run();
+  return db.select({ parkId: rides.parkId }).from(rides).where(eq(rides.id, rideId)).get()?.parkId;
+}
+
+export function updateRideManufacturerRecord(rideId: string, manufacturer: string): void {
+  db.update(rides).set({ manufacturer }).where(eq(rides.id, rideId)).run();
 }
 
 export function exportBackup(): BackupInput {

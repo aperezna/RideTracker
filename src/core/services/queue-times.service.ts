@@ -9,6 +9,7 @@ const externalRideSchema = z.object({
   id: z.union([z.string(), z.number()]),
   name: z.string(),
   is_open: z.boolean().optional(),
+  wait_time: z.number().int().nonnegative().optional(),
   category: z.string().optional(),
   manufacturer: z.string().optional(),
 });
@@ -55,11 +56,24 @@ export type ImportedPark = {
 
 export type QueueTimesFetch = typeof fetch;
 
+export type QueueTimesRideStatus = {
+  isOpen: boolean | null;
+  waitTime: number | null;
+};
+
+export type QueueTimesStatus = {
+  parkClosed: boolean;
+  rides: Record<string, QueueTimesRideStatus>;
+};
+
 function mapCategory(category: string | undefined): ImportedRide["category"] {
   const normalized = category?.toUpperCase().replace(/[ -]/g, "_");
-  return rideCategories.includes(normalized as ImportedRide["category"])
-    ? (normalized as ImportedRide["category"])
-    : "FLAT_RIDE";
+  if (normalized === "COASTER" || normalized === "ROLLER_COASTER") return "COASTER";
+  if (normalized === "DARK_RIDE" || normalized === "DARKRIDE") return "DARK_RIDE";
+  if (normalized === "WATER" || normalized === "WATER_RIDE") return "WATER";
+  if (normalized === "SHOW") return "SHOW";
+  if (normalized === "FLAT_RIDE" || normalized === "FLAT") return "FLAT_RIDE";
+  return rideCategories.includes(normalized as ImportedRide["category"]) ? (normalized as ImportedRide["category"]) : "FLAT_RIDE";
 }
 
 function createTimeoutSignal(): { signal: AbortSignal; cancel: () => void } {
@@ -136,4 +150,32 @@ export async function getExternalPark(
     category: mapCategory(ride.category),
     manufacturer: ride.manufacturer ?? "",
   })) };
+}
+
+export async function getQueueTimesStatus(
+  externalId: string,
+  fetchImpl: QueueTimesFetch = fetch,
+  baseUrl = process.env.QUEUE_TIMES_BASE_URL ?? DEFAULT_BASE_URL,
+): Promise<QueueTimesStatus | null> {
+  let payload: unknown;
+  try {
+    payload = await fetchJson(`${baseUrl.replace(/\/$/, "")}/parks/${encodeURIComponent(externalId)}/queue_times.json`, fetchImpl);
+  } catch {
+    return null;
+  }
+
+  const detail = queueTimesDetailSchema.safeParse(payload);
+  if (!detail.success) return null;
+
+  const detailRides = [...(detail.data.rides ?? []), ...(detail.data.lands ?? []).flatMap((land) => land.rides ?? [])];
+  const rides = Object.fromEntries(detailRides.map((ride) => [String(ride.id), {
+    isOpen: ride.is_open ?? null,
+    waitTime: ride.wait_time ?? null,
+  }]));
+  const knownOpenStates = detailRides.map((ride) => ride.is_open).filter((isOpen): isOpen is boolean => isOpen !== undefined);
+
+  return {
+    parkClosed: knownOpenStates.length > 0 && knownOpenStates.every((isOpen) => !isOpen),
+    rides,
+  };
 }
