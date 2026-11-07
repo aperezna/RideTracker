@@ -2,6 +2,7 @@
 
 import "leaflet/dist/leaflet.css";
 
+import Link from "next/link";
 import { CircleMarker, MapContainer, Popup, TileLayer } from "react-leaflet";
 
 import type { DomainPark } from "@/core/domain/dashboard-stats";
@@ -28,7 +29,9 @@ export default function LeafletParksMap({ parks }: LeafletParksMapProps) {
           pathOptions={{ color: statusColors[park.status], fillColor: statusColors[park.status], fillOpacity: 0.85 }}
         >
           <Popup>
-            <strong>{park.name}</strong>
+            <Link href={`/parks/${park.id}`}>
+              <strong>{park.name}</strong>
+            </Link>
             <br />
              {park.country} · {t(statusTranslationKey(park.status))}
           </Popup>

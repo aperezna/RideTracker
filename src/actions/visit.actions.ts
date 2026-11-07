@@ -2,8 +2,8 @@
 
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
-import { createVisitDayRecord, updateVisitDayNotesRecord } from "@/core/db/repositories";
-import { visitDaySchema } from "@/core/validators/visit-day.schema";
+import { createVisitDayRecord, updateVisitDayRecord } from "@/core/db/repositories";
+import { updateVisitDaySchema, visitDaySchema } from "@/core/validators/visit-day.schema";
 import { isValidSessionToken, SESSION_COOKIE_NAME } from "@/core/auth/session";
 
 async function requireSession(): Promise<void> {
@@ -20,9 +20,17 @@ export async function recordVisitDay(input: unknown): Promise<string> {
   return id;
 }
 
-export async function updateVisitDayNotes(visitDayId: string, tripNotes: string): Promise<void> {
+export async function updateVisitDay(visitDayId: string, input: unknown): Promise<void> {
   await requireSession();
-  updateVisitDayNotesRecord(visitDayId, tripNotes);
+  const visit = updateVisitDaySchema.parse(input);
+  updateVisitDayRecord(visitDayId, {
+    visitDate: visit.visitDate,
+    tripNotes: visit.tripNotes ?? null,
+    durationMinutes: visit.durationMinutes ?? null,
+    weather: visit.weather ?? null,
+    company: visit.company ?? null,
+    overallRating: visit.overallRating ?? null,
+  });
   revalidatePath(`/visits/${visitDayId}`);
   revalidatePath("/parks");
 }

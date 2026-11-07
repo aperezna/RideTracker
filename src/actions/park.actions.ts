@@ -2,7 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
-import { createParkRecord, importParkRecord, updateRideManufacturerRecord, updateParkNotesRecord, updateParkStatusRecord } from "@/core/db/repositories";
+import { createParkRecord, deleteParkRecord, enqueueRideCategoryJobs, importParkRecord, updateRideManufacturerRecord, updateParkNotesRecord, updateParkStatusRecord } from "@/core/db/repositories";
 import { getExternalPark, searchExternalParks, type ImportedPark } from "@/core/services/queue-times.service";
 import { getWikipediaManufacturer } from "@/core/services/wikimedia.service";
 import { parkSchema } from "@/core/validators/park.schema";
@@ -29,6 +29,15 @@ function importedParkValues(park: ImportedPark) {
   };
 }
 
+async function enrichRideManufacturers(parkId: string, park: ImportedPark): Promise<void> {
+  for (const ride of park.rides) {
+    if (!ride.manufacturer) {
+      const manufacturer = await getWikipediaManufacturer(ride.name);
+      if (manufacturer) updateRideManufacturerRecord(`${parkId}-ride-${ride.externalId}`, manufacturer);
+    }
+  }
+}
+
 export async function refreshParkCatalog(externalId: string): Promise<void> {
   await requireSession();
   const park = await getExternalPark(externalId);
@@ -38,15 +47,11 @@ export async function refreshParkCatalog(externalId: string): Promise<void> {
     parkId: storedParkId,
     externalId: ride.externalId,
     name: ride.name,
-    category: ride.category,
+    category: ride.category ?? "UNKNOWN",
     manufacturer: ride.manufacturer,
   })));
-  for (const ride of park.rides) {
-    if (!ride.manufacturer) {
-      const manufacturer = await getWikipediaManufacturer(ride.name);
-      if (manufacturer) updateRideManufacturerRecord(`${storedParkId}-ride-${ride.externalId}`, manufacturer);
-    }
-  }
+  enqueueRideCategoryJobs(storedParkId, park.rides.map((ride) => `${storedParkId}-ride-${ride.externalId}`));
+  void enrichRideManufacturers(storedParkId, park);
   revalidatePath(`/parks/${storedParkId}`);
 }
 
@@ -65,9 +70,11 @@ export async function importPark(externalId: string): Promise<string> {
         parkId,
         externalId: ride.externalId,
         name: ride.name,
-        category: ride.category,
+        category: ride.category ?? "UNKNOWN",
         manufacturer: ride.manufacturer,
       })));
+  enqueueRideCategoryJobs(parkId, imported.rides.map((ride) => `${parkId}-ride-${ride.externalId}`));
+  void enrichRideManufacturers(parkId, imported);
   revalidatePath("/");
   return parkId;
 }
@@ -95,4 +102,12 @@ export async function updateParkStatus(parkId: string, status: "WISHLIST" | "PLA
   revalidatePath("/");
   revalidatePath("/parks");
   revalidatePath(`/parks/${parkId}`);
+}
+
+export async function deletePark(parkId: string): Promise<void> {
+  await requireSession();
+  if (!parkId.trim()) throw new Error("Park id is required");
+  deleteParkRecord(parkId);
+  revalidatePath("/");
+  revalidatePath("/parks");
 }

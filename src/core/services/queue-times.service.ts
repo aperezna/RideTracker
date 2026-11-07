@@ -4,6 +4,7 @@ import { rideCategories } from "../db/schema";
 
 const DEFAULT_BASE_URL = "https://queue-times.com";
 const REQUEST_TIMEOUT_MS = 5_000;
+const QUEUE_TIMES_CACHE_SECONDS = 600;
 
 const externalRideSchema = z.object({
   id: z.union([z.string(), z.number()]),
@@ -40,7 +41,7 @@ const queueTimesDetailSchema = z.object({
 export type ImportedRide = {
   externalId: string;
   name: string;
-  category: (typeof rideCategories)[number];
+  category: (typeof rideCategories)[number] | null;
   manufacturer: string;
 };
 
@@ -68,12 +69,13 @@ export type QueueTimesStatus = {
 
 function mapCategory(category: string | undefined): ImportedRide["category"] {
   const normalized = category?.toUpperCase().replace(/[ -]/g, "_");
+  if (!normalized) return null;
   if (normalized === "COASTER" || normalized === "ROLLER_COASTER") return "COASTER";
   if (normalized === "DARK_RIDE" || normalized === "DARKRIDE") return "DARK_RIDE";
   if (normalized === "WATER" || normalized === "WATER_RIDE") return "WATER";
   if (normalized === "SHOW") return "SHOW";
   if (normalized === "FLAT_RIDE" || normalized === "FLAT") return "FLAT_RIDE";
-  return rideCategories.includes(normalized as ImportedRide["category"]) ? (normalized as ImportedRide["category"]) : "FLAT_RIDE";
+  return rideCategories.includes(normalized as (typeof rideCategories)[number]) ? (normalized as (typeof rideCategories)[number]) : null;
 }
 
 function createTimeoutSignal(): { signal: AbortSignal; cancel: () => void } {
@@ -82,10 +84,14 @@ function createTimeoutSignal(): { signal: AbortSignal; cancel: () => void } {
   return { signal: controller.signal, cancel: () => clearTimeout(timeout) };
 }
 
-async function fetchJson(url: string, fetchImpl: QueueTimesFetch): Promise<unknown> {
+async function fetchJson(url: string, fetchImpl: QueueTimesFetch, cacheSeconds?: number): Promise<unknown> {
   const timeout = createTimeoutSignal();
   try {
-    const response = await fetchImpl(url, { signal: timeout.signal, headers: { accept: "application/json" } });
+    const response = await fetchImpl(url, {
+      signal: timeout.signal,
+      headers: { accept: "application/json" },
+      ...(cacheSeconds ? { next: { revalidate: cacheSeconds } } : {}),
+    } as RequestInit);
     if (!response.ok) {
       throw new Error(`Queue-Times request failed with status ${response.status}`);
     }
@@ -144,12 +150,15 @@ export async function getExternalPark(
   const detail = queueTimesDetailSchema.safeParse(detailPayload);
   if (!detail.success) return park;
   const detailRides = [...(detail.data.rides ?? []), ...(detail.data.lands ?? []).flatMap((land) => land.rides ?? [])];
-  return { ...park, rides: detailRides.map((ride) => ({
-    externalId: String(ride.id),
-    name: ride.name,
-    category: mapCategory(ride.category),
-    manufacturer: ride.manufacturer ?? "",
-  })) };
+  return { ...park, rides: detailRides.map((ride) => {
+    const existingRide = park.rides.find((candidate) => candidate.externalId === String(ride.id));
+    return {
+      externalId: String(ride.id),
+      name: ride.name,
+      category: mapCategory(ride.category) ?? existingRide?.category ?? null,
+      manufacturer: ride.manufacturer ?? existingRide?.manufacturer ?? "",
+    };
+  }) };
 }
 
 export async function getQueueTimesStatus(
@@ -159,7 +168,7 @@ export async function getQueueTimesStatus(
 ): Promise<QueueTimesStatus | null> {
   let payload: unknown;
   try {
-    payload = await fetchJson(`${baseUrl.replace(/\/$/, "")}/parks/${encodeURIComponent(externalId)}/queue_times.json`, fetchImpl);
+    payload = await fetchJson(`${baseUrl.replace(/\/$/, "")}/parks/${encodeURIComponent(externalId)}/queue_times.json`, fetchImpl, QUEUE_TIMES_CACHE_SECONDS);
   } catch {
     return null;
   }

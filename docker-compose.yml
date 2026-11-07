@@ -13,3 +13,27 @@ services:
     volumes:
       - ./data:/app/data
     restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000').then(r => { if (!r.ok) process.exit(1) }).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  enrichment-worker:
+    image: ridetracker:latest
+    depends_on:
+      ridetracker:
+        condition: service_started
+    environment:
+      APP_MASTER_PASSWORD: ${APP_MASTER_PASSWORD:?APP_MASTER_PASSWORD must be set}
+      DATABASE_URL: /app/data/coastervault.db
+      NODE_ENV: production
+      ENRICHMENT_HEARTBEAT_PATH: /app/data/enrichment-worker.heartbeat
+    volumes:
+      - ./data:/app/data
+    restart: unless-stopped
+    command: ["node_modules/.bin/tsx", "scripts/enrichment-worker.ts"]
+    healthcheck:
+      test: ["CMD", "node", "-e", "const fs = require('fs'); try { if (Date.now() - fs.statSync('/app/data/enrichment-worker.heartbeat').mtimeMs > 120000) process.exit(1) } catch { process.exit(1) }"]
+      interval: 30s
+      timeout: 5s
+      retries: 3

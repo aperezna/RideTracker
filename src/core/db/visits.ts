@@ -25,6 +25,10 @@ export function getVisitDayData(visitDayId: string): VisitDayData | null {
     country: park.country,
     visitDate: visit.visitDate,
     tripNotes: visit.tripNotes,
+    durationMinutes: visit.durationMinutes,
+    weather: visit.weather,
+    company: visit.company,
+    overallRating: visit.overallRating,
     rides: rideRows.map((ride) => ({
       id: ride.id,
       name: ride.name,

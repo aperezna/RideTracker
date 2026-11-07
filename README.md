@@ -1,6 +1,6 @@
 # RideTracker
 
-RideTracker is a self-hosted personal theme-park and roller-coaster tracker. It combines a SQLite-backed catalog, park planning, visit history, ride logging, ratings, an interactive world map, and a production-ready Docker image.
+RideTracker is a self-hosted personal theme-park and attraction tracker. It combines a SQLite-backed catalog, park planning, editable visit history, attraction experiences, ratings, an interactive world map, live queue data, progressive enrichment, and a production-ready Docker image.
 
 The current release is designed for a single private instance: one master password protects the application and SQLite stores the data locally in `./data`.
 
@@ -27,9 +27,15 @@ Check the container:
 ```powershell
 docker compose ps
 docker compose logs -f ridetracker
+docker compose logs -f enrichment-worker
 ```
 
-The application runs inside the container as the non-root user `nextjs` (UID 1001). SQLite data is persisted in the repository's `data/` directory.
+The Compose stack runs two services:
+
+- `ridetracker` — Next.js web application on port `3000`.
+- `enrichment-worker` — independent SQLite-backed worker for attraction metadata, photos, descriptions, and storytelling.
+
+Both services run inside the container as the non-root user `nextjs` (UID 1001). SQLite data is persisted in the repository's `data/` directory.
 
 ### Stop the application
 
@@ -47,6 +53,7 @@ Stopping the stack does not delete `./data`.
 | `DATABASE_URL` | No | `/app/data/coastervault.db` in Docker | SQLite database path inside the container. |
 | `QUEUE_TIMES_BASE_URL` | No | `https://queue-times.com` | Override the Queue-Times API base URL for testing or a compatible service. |
 | `NODE_ENV` | No | `production` in Docker | Next.js runtime mode. |
+| `ENRICHMENT_HEARTBEAT_PATH` | No | `/app/data/enrichment-worker.heartbeat` | Worker heartbeat file used by the Docker healthcheck. |
 
 Do not commit real passwords, `.env` files, SQLite data, or generated `.atl/` files. For repeatable local runs, set the password in the shell that invokes Compose or use a secrets manager in the deployment environment.
 
@@ -70,7 +77,7 @@ The global navigation provides:
 Additional routes are reached from catalog cards and visit history:
 
 - `/parks/[id]` — park detail, ride inventory, notes, and visit history.
-- `/visits/[id]` — visit detail and ride logging.
+- `/visits/[id]` — editable park visit and concrete attraction experiences.
 
 ### Managing parks
 
@@ -87,10 +94,26 @@ Queue-Times responses are validated and normalized. The integration accepts the 
 
 Park detail pages provide the ride inventory and visit history. Visit workflows support:
 
-- Creating and editing visit notes.
+- Creating a park visit with a historical date.
+- Editing the visit date, notes, duration, weather, company, and overall day rating.
+- Adding more attractions to an existing historical visit without creating a duplicate visit day.
 - Recording ride laps and ride status.
 - Rating rides and storing preferred rows or review notes.
 - Automatically transitioning a planned park to visited when its first visit is recorded.
+
+RideTracker distinguishes the **park visit** (`visit_days`) from each concrete **attraction experience** (`ride_logs`). This keeps day-level context separate from individual check-ins while allowing multiple experiences to belong to one historical visit.
+
+### Live status and enrichment
+
+Park and attraction data is assembled progressively from explicit source adapters:
+
+- Queue-Times — catalog import and fallback live status.
+- ThemeParks.wiki — primary live attraction status where park and attraction names match.
+- Wikimedia — photos and contextual descriptions.
+- Wikidata — structured metadata fallback.
+- RCDB — roller-coaster-specific fallback data.
+
+Source URLs are retained where applicable and live-status attribution is shown in the park inventory. Providers are queried through fail-soft adapters; unsupported or rate-limited sources do not block catalog usage.
 
 ### Map
 
@@ -112,12 +135,15 @@ The database file is:
 ./data/coastervault.db
 ```
 
-SQLite runs with WAL mode and foreign-key enforcement. On startup, RideTracker idempotently creates the baseline tables when the database file is new or empty:
+SQLite runs with WAL mode and foreign-key enforcement. On startup, RideTracker idempotently creates the baseline tables and applies non-destructive column migrations when the database file is new or already exists. Visit-day metadata includes duration, weather, company, and overall rating.
+
+The enrichment queue stores durable `PENDING`, `PROCESSING`, `RETRY`, `DONE`, and `FAILED` states, attempt counts, next-attempt timestamps, and bounded error messages. The independent worker recovers stale processing jobs, applies bounded exponential backoff, and periodically scans for pending work.
 
 - `parks`
 - `rides`
 - `visit_days`
 - `ride_logs`
+- `category_enrichment_jobs`
 
 Back up the `data/` directory before upgrades or maintenance. To intentionally reset all local data, stop the stack and remove `data/coastervault.db`, `data/coastervault.db-wal`, and `data/coastervault.db-shm`. This is destructive and cannot be undone without a backup.
 
@@ -136,7 +162,7 @@ src/
     ├── auth/                    # Session token creation and validation
     ├── db/                      # SQLite connection, schema, repositories
     ├── domain/                  # Pure domain calculations and transitions
-    ├── services/                # Queue-Times integration
+    ├── services/                # External source adapters and enrichment worker
     └── validators/              # Zod input validation
 ```
 
@@ -148,6 +174,7 @@ src/
 4. Zod validates manual park and activity inputs.
 5. Repository functions isolate Drizzle/SQLite access.
 6. `revalidatePath` refreshes affected dashboard and catalog views.
+7. The separate enrichment worker claims durable SQLite jobs and never depends on a web request to make progress.
 
 ### Docker image
 
@@ -157,7 +184,8 @@ The multi-stage `Dockerfile`:
 2. Installs dependencies with `npm ci`.
 3. Builds a standalone Next.js production bundle.
 4. Creates the `nextjs` UID 1001 runtime user.
-5. Uses `su-exec` to repair bind-mount ownership and drop privileges.
+5. Includes the worker runtime and source entrypoint alongside the standalone web bundle.
+6. Uses `su-exec` to repair bind-mount ownership and drop privileges.
 
 The image has been verified for `linux/amd64` and `linux/arm64` builds.
 
@@ -191,6 +219,7 @@ Set `APP_MASTER_PASSWORD` and `DATABASE_URL` before starting the server. The def
 | `npm run typecheck` | Run TypeScript without emitting files. |
 | `npm run lint` | Run ESLint. |
 | `npm run test` | Run the Vitest suite. |
+| `npm run worker:enrichment` | Run the enrichment worker locally. |
 
 Run the full validation suite in Docker when the host cannot compile `better-sqlite3`:
 
@@ -209,6 +238,7 @@ $env:APP_MASTER_PASSWORD = "change-this-password"
 docker compose up -d --build
 docker compose ps
 docker compose logs --tail 100 ridetracker
+docker compose logs --tail 100 enrichment-worker
 ```
 
 Verify the following manually:
@@ -219,6 +249,9 @@ Verify the following manually:
 - Importing a park creates the park and its rides.
 - SQLite files remain under `./data`.
 - The container process runs as UID 1001.
+- Both Compose services report `healthy`.
+- The worker heartbeat is updated at `./data/enrichment-worker.heartbeat`.
+- Enrichment logs report completed and failed jobs as JSON events.
 
 The v1.0.0 runtime baseline was measured at 38.61 MiB RAM, 151 ms maximum observed dashboard latency, and UID 1001 for the SQLite database/WAL files.
 

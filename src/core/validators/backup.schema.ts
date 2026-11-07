@@ -5,7 +5,7 @@ const backupParkSchema = z.object({
   latitude: z.number(), longitude: z.number(), status: z.enum(["WISHLIST", "PLANNED", "VISITED"]), tripNotes: z.string(), createdAt: z.union([z.string(), z.number(), z.date()]),
 });
 const backupRideSchema = z.object({
-  id: z.string(), parkId: z.string(), externalId: z.string().nullable(), name: z.string(), category: z.enum(["COASTER", "DARK_RIDE", "WATER", "FLAT_RIDE", "SHOW"]), manufacturer: z.string(), rating: z.number().nullable(), preferredRow: z.string().nullable(), reviewNotes: z.string().nullable(),
+  id: z.string(), parkId: z.string(), externalId: z.string().nullable(), name: z.string(), category: z.enum(["COASTER", "DARK_RIDE", "WATER", "FLAT_RIDE", "SHOW", "UNKNOWN"]), manufacturer: z.string(), photoUrl: z.string().nullable().optional(), photoSourceUrl: z.string().nullable().optional(), rating: z.number().nullable(), preferredRow: z.string().nullable(), reviewNotes: z.string().nullable(),
 });
 const backupVisitDaySchema = z.object({ id: z.string(), parkId: z.string(), visitDate: z.string(), tripNotes: z.string().nullable(), createdAt: z.union([z.string(), z.number(), z.date()]) });
 const backupRideLogSchema = z.object({ id: z.string(), visitDayId: z.string(), rideId: z.string(), status: z.enum(["RIDDEN", "CLOSED"]), lapCount: z.number().int().min(1), rowUsed: z.string().nullable(), notes: z.string().nullable() });

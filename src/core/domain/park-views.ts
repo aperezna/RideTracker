@@ -16,6 +16,8 @@ export type RideInventoryData = {
   name: string;
   category: RideCategory;
   manufacturer: string;
+  photoUrl: string | null;
+  photoSourceUrl: string | null;
   rating: number | null;
   preferredRow: string | null;
   totalLaps: number;
@@ -29,12 +31,18 @@ export type RideDetailData = RideInventoryData & {
   parkCity: string;
   externalId: string | null;
   reviewNotes: string | null;
+  experience: string | null;
+  storytelling: string | null;
 };
 
 export type VisitHistoryData = {
   id: string;
   visitDate: string;
   tripNotes: string | null;
+  durationMinutes: number | null;
+  weather: string | null;
+  company: string | null;
+  overallRating: number | null;
   totalLaps: number;
   rideCount: number;
 };
@@ -66,5 +74,9 @@ export type VisitDayData = {
   country: string;
   visitDate: string;
   tripNotes: string | null;
+  durationMinutes: number | null;
+  weather: string | null;
+  company: string | null;
+  overallRating: number | null;
   rides: VisitRideData[];
 };

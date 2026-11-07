@@ -13,12 +13,13 @@ function createSchema(connection: ReturnType<typeof createDatabase>): void {
     );
     CREATE TABLE rides (
       id TEXT PRIMARY KEY, park_id TEXT NOT NULL REFERENCES parks(id), external_id TEXT,
-      name TEXT NOT NULL, category TEXT NOT NULL, manufacturer TEXT NOT NULL DEFAULT '',
+       name TEXT NOT NULL, category TEXT NOT NULL, manufacturer TEXT NOT NULL DEFAULT '', photo_url TEXT, photo_source_url TEXT,
+       experience TEXT, storytelling TEXT,
       rating REAL, preferred_row TEXT, review_notes TEXT
     );
     CREATE TABLE visit_days (
       id TEXT PRIMARY KEY, park_id TEXT NOT NULL REFERENCES parks(id), visit_date TEXT NOT NULL,
-      trip_notes TEXT, created_at INTEGER NOT NULL
+       trip_notes TEXT, duration_minutes INTEGER, weather TEXT, company TEXT, overall_rating REAL, created_at INTEGER NOT NULL
     );
     CREATE TABLE ride_logs (
       id TEXT PRIMARY KEY, visit_day_id TEXT NOT NULL REFERENCES visit_days(id), ride_id TEXT NOT NULL REFERENCES rides(id),

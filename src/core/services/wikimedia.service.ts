@@ -1,13 +1,9 @@
 import { z } from "zod";
 
 import type { Locale } from "@/core/i18n/translations";
-
-const summarySchema = z.object({
-  title: z.string().optional(),
-  extract: z.string().optional(),
-  content_urls: z.object({ desktop: z.object({ page: z.string() }).optional() }).optional(),
-  thumbnail: z.object({ source: z.string() }).optional(),
-});
+import type { RideCategory } from "@/core/db/schema";
+import { getWikidataRideEnrichment } from "./wikidata.service";
+import { getRcdbRideEnrichment } from "./rcdb.service";
 
 const wikitextSchema = z.object({
   query: z.object({ pages: z.array(z.object({ revisions: z.array(z.object({ slots: z.object({ main: z.object({ content: z.string() }) }) })) })) }),
@@ -28,7 +24,21 @@ export type RideEnrichment = {
   photoUrl: string | null;
   sourceUrl: string | null;
   manufacturer: string | null;
+  category: RideCategory | null;
 };
+
+export function inferRideCategoryFromWikipedia(content: string | null): RideCategory | null {
+  if (!content) return null;
+  const infobox = content.match(/^\|\s*(?:type|type_of_ride|ride_type|attraction_type|classification)\s*=\s*(.+)$/gim)?.join(" ") ?? "";
+  const introduction = content.split(/^={2,4}\s/m)[0].slice(0, 2_000);
+  const text = cleanWikitext(`${infobox} ${introduction}`).toLowerCase();
+  if (/water\s+(?:ride|coaster)|log flume|water slide|water attraction/.test(text)) return "WATER";
+  if (/roller\s*coaster|rollercoaster|roller_coaster|montaña rusa/.test(text)) return "COASTER";
+  if (/dark\s+ride|darkride|haunted house|ghost train/.test(text)) return "DARK_RIDE";
+  if (/show|theatrical|theatre|theater|spectacle/.test(text)) return "SHOW";
+  if (/flat\s+ride|carousel|ferris wheel|observation wheel|swing ride|drop tower/.test(text)) return "FLAT_RIDE";
+  return null;
+}
 
 function createTimeoutSignal(): { signal: AbortSignal; cancel: () => void } {
   const controller = new AbortController();
@@ -38,6 +48,30 @@ function createTimeoutSignal(): { signal: AbortSignal; cancel: () => void } {
 
 function cleanWikitext(value: string): string {
   return value.replace(/<ref[^>]*>[\s\S]*?<\/ref>/gi, "").replace(/\[\[([^\]|]+)(?:\|([^\]]+))?\]\]/g, "$2$1").replace(/\{\{[^}]+\}\}/g, "").replace(/<[^>]+>/g, "").replace(/'{2,}/g, "").trim();
+}
+
+export function extractWikipediaMetaContent(html: string, property: string): string | null {
+  const escapedProperty = property.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const match = html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${escapedProperty}["'][^>]+content=["']([^"']+)["']`, "i"))
+    ?? html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${escapedProperty}["']`, "i"));
+  return match?.[1]?.replace(/&amp;/g, "&").replace(/&#x27;/g, "'") ?? null;
+}
+
+export function extractWikipediaLeadText(html: string): string | null {
+  const paragraphs = [...html.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)];
+  for (const paragraph of paragraphs) {
+    const text = paragraph[1]
+      .replace(/<sup[^>]*>[\s\S]*?<\/sup>/gi, "")
+      .replace(/<[^>]+>/g, " ")
+      .replace(/&nbsp;/gi, " ")
+      .replace(/&amp;/gi, "&")
+      .replace(/&#39;|&#x27;/gi, "'")
+      .replace(/&quot;/gi, '"')
+      .replace(/\s+/g, " ")
+      .trim();
+    if (text.length >= 60) return text.slice(0, 3_500);
+  }
+  return null;
 }
 
 async function getWikipediaWikitext(title: string, language: string): Promise<string | null> {
@@ -55,8 +89,34 @@ async function getWikipediaWikitext(title: string, language: string): Promise<st
   }
 }
 
+async function getWikipediaPageText(title: string, language: string): Promise<string | null> {
+  const { signal, cancel } = createTimeoutSignal();
+  try {
+    const pageTitle = encodeURIComponent(title.replace(/\s+/g, "_"));
+    const response = await fetch(`https://${language}.wikipedia.org/wiki/${pageTitle}`, { signal, headers: { accept: "text/html", "user-agent": "RideTracker/1.0" }, next: { revalidate: 86_400 } });
+    if (!response.ok) return null;
+    return await response.text();
+  } catch {
+    return null;
+  } finally {
+    cancel();
+  }
+}
+
 export async function getWikipediaManufacturer(title: string, language = "en"): Promise<string | null> {
   return extractManufacturer(await getWikipediaWikitext(title, language));
+}
+
+export async function getWikipediaRideCategory(name: string, parkName: string, language = "en"): Promise<RideCategory | null> {
+  for (const title of [name, `${name} (${parkName})`]) {
+    const directContent = await getWikipediaWikitext(title, language) ?? await getWikipediaPageText(title, language);
+    const directCategory = inferRideCategoryFromWikipedia(directContent);
+    if (directCategory) return directCategory;
+  }
+  const title = await findWikipediaTitle(name, parkName, language);
+  if (!title) return null;
+  const content = await getWikipediaWikitext(title, language) ?? await getWikipediaPageText(title, language);
+  return inferRideCategoryFromWikipedia(content);
 }
 
 function extractManufacturer(content: string | null): string | null {
@@ -91,7 +151,7 @@ async function findWikipediaTitle(name: string, parkName: string, language: stri
   }
 }
 
-async function translateStorytelling(text: string, sourceLanguage: string, targetLanguage: Locale): Promise<string> {
+export async function translateEnrichmentText(text: string, sourceLanguage: string, targetLanguage: Locale): Promise<string> {
   if (sourceLanguage === targetLanguage || targetLanguage !== "es") return text;
   const { signal, cancel } = createTimeoutSignal();
   try {
@@ -124,32 +184,33 @@ export async function getRideEnrichment(name: string, parkName: string, locale: 
     language = "en";
     wikipediaTitle = await findWikipediaTitle(name, parkName, language);
   }
-  if (!wikipediaTitle) return null;
-  const title = encodeURIComponent(wikipediaTitle.replace(/\s+/g, "_"));
-  const { signal, cancel } = createTimeoutSignal();
-  try {
-    const response = await fetch(`https://${language}.wikipedia.org/api/rest_v1/page/summary/${title}`, {
-      signal,
-      headers: { accept: "application/json", "user-agent": "RideTracker/1.0" },
-      next: { revalidate: 86_400 },
-    });
-    if (!response.ok) return null;
-    const result = summarySchema.safeParse(await response.json());
-    if (!result.success) return null;
-    const article = await getWikipediaWikitext(result.data.title ?? name, language);
-    const experience = result.data.extract ? await translateStorytelling(result.data.extract, language, locale) : null;
-    const story = extractStorytelling(article) ?? result.data.extract ?? null;
+  const candidateTitles = [...new Set(wikipediaTitle ? [wikipediaTitle, `${name} (${parkName})`] : [`${name} (${parkName})`, name])];
+  for (const candidateTitle of candidateTitles) {
+    const html = await getWikipediaPageText(candidateTitle, language);
+    if (!html) continue;
+    if (!wikipediaTitle && candidateTitle === name && !html.toLowerCase().includes(parkName.toLowerCase())) continue;
+    const article = await getWikipediaWikitext(candidateTitle, language) ?? html;
+    const description = extractWikipediaMetaContent(html, "description") ?? extractWikipediaMetaContent(html, "og:description") ?? extractWikipediaLeadText(html);
+    const story = extractStorytelling(article) ?? description;
+    const title = extractWikipediaMetaContent(html, "og:title") ?? candidateTitle;
+    const wikidata = await getWikidataRideEnrichment(name, parkName);
+    const wikipediaPhotoUrl = extractWikipediaMetaContent(html, "og:image");
+    const wikipediaCategory = inferRideCategoryFromWikipedia(article);
+    const rcdb = !wikipediaPhotoUrl || !wikipediaCategory ? await getRcdbRideEnrichment(name, parkName) : null;
+    const photoUrl = wikipediaPhotoUrl ?? wikidata?.photoUrl ?? rcdb?.photoUrl ?? null;
+    const category = wikipediaCategory ?? wikidata?.category ?? rcdb?.category ?? null;
     return {
-      title: result.data.title ?? name,
-      experience,
-      storytelling: story ? await translateStorytelling(story, language, locale) : null,
-      photoUrl: result.data.thumbnail?.source ?? null,
-      sourceUrl: result.data.content_urls?.desktop?.page ?? null,
+      title,
+      experience: description ? await translateEnrichmentText(description, language, locale) : null,
+      storytelling: story ? await translateEnrichmentText(story, language, locale) : null,
+      photoUrl,
+      sourceUrl: wikipediaPhotoUrl ? `https://${language}.wikipedia.org/wiki/${encodeURIComponent(candidateTitle.replace(/\s+/g, "_"))}` : wikidata?.photoUrl ? wikidata.sourceUrl : rcdb?.sourceUrl ?? wikidata?.sourceUrl ?? `https://${language}.wikipedia.org/wiki/${encodeURIComponent(candidateTitle.replace(/\s+/g, "_"))}`,
       manufacturer: extractManufacturer(article),
+      category,
     };
-  } catch {
-    return null;
-  } finally {
-    cancel();
   }
+  const wikidata = await getWikidataRideEnrichment(name, parkName);
+  const rcdb = !wikidata?.photoUrl || !wikidata?.category ? await getRcdbRideEnrichment(name, parkName) : null;
+  if (!wikidata && !rcdb) return null;
+  return { title: wikidata?.title ?? name, experience: null, storytelling: null, photoUrl: wikidata?.photoUrl ?? rcdb?.photoUrl ?? null, sourceUrl: wikidata?.sourceUrl ?? rcdb?.sourceUrl ?? "", manufacturer: null, category: wikidata?.category ?? rcdb?.category ?? null };
 }
