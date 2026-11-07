@@ -115,6 +115,31 @@ Park and attraction data is assembled progressively from explicit source adapter
 
 Source URLs are retained where applicable and live-status attribution is shown in the park inventory. Providers are queried through fail-soft adapters; unsupported or rate-limited sources do not block catalog usage.
 
+### Mobile and offline mode
+
+RideTracker is installable as a PWA and registers a service worker for the application shell. The in-park check-in flow is designed to remain useful when connectivity is unreliable:
+
+- Ride check-ins are written to an IndexedDB queue when the browser is offline.
+- Each queued request has an idempotent ID, so a retry cannot create a duplicate log.
+- The queue synchronizes automatically when the browser reports connectivity again.
+- The navigation bar shows offline state and pending check-ins.
+- Check-ins do not wait for Queue-Times, ThemeParks.wiki, Wikimedia, or any other enrichment provider.
+
+The offline boundary is deliberate: local ride-log capture is available offline, while catalog changes and external enrichment still require the authenticated server connection.
+
+### Data and analytics
+
+The dashboard now builds personal analytics from persisted visits, attraction experiences, ratings, laps, and live wait observations:
+
+- Park and attraction rankings.
+- Total visits, experiences, laps, and estimated wait exposure.
+- Shortest and longest observed queues per attraction.
+- Best-rated or most productive visit days.
+- Visit comparisons using the same persisted day-level and attraction-level data.
+- Authenticated JSON and CSV downloads at `/api/export?format=json` and `/api/export?format=csv`.
+
+Wait history records the provider, observation time, open/closed state, and wait minutes. “Estimated wait” is based on observed queues; RideTracker does not claim time saved until actual queue duration is recorded.
+
 ### Map
 
 The dashboard map uses Leaflet with public OpenStreetMap tiles. The application does not require a CARTO API key.

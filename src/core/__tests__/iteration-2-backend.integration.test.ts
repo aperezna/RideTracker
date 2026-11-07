@@ -59,4 +59,5 @@ describe("Iteration 2 SQLite persistence", () => {
   it("transitions a planned park to VISITED on its first visit", () => {
     expect(transitionParkStatusOnFirstVisit("PLANNED")).toBe("VISITED");
   });
+
 });

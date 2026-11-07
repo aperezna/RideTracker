@@ -56,6 +56,15 @@ export const rideLogs = sqliteTable("ride_logs", {
   notes: text("notes"),
 });
 
+export const waitTimeObservations = sqliteTable("wait_time_observations", {
+  id: text("id").primaryKey(),
+  rideId: text("ride_id").notNull().references(() => rides.id),
+  source: text("source").notNull(),
+  waitMinutes: integer("wait_minutes"),
+  isOpen: integer("is_open", { mode: "boolean" }),
+  observedAt: integer("observed_at", { mode: "timestamp_ms" }).notNull(),
+});
+
 export const categoryEnrichmentJobs = sqliteTable("category_enrichment_jobs", {
   id: text("id").primaryKey(),
   parkId: text("park_id").notNull().references(() => parks.id),

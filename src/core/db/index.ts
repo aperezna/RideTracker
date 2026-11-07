@@ -50,6 +50,14 @@ function ensureSchema(client: Database.Database): void {
       row_used TEXT,
       notes TEXT
     );
+    CREATE TABLE IF NOT EXISTS wait_time_observations (
+      id TEXT PRIMARY KEY,
+      ride_id TEXT NOT NULL REFERENCES rides(id),
+      source TEXT NOT NULL,
+      wait_minutes INTEGER,
+      is_open INTEGER,
+      observed_at INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS category_enrichment_jobs (
       id TEXT PRIMARY KEY,
       park_id TEXT NOT NULL REFERENCES parks(id),

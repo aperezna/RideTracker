@@ -5,6 +5,7 @@ import { AppNavigation } from "@/components/layout/AppNavigation";
 import { LocaleProvider } from "@/components/i18n/LocaleProvider";
 import { getRequestLocale } from "@/core/i18n/server";
 import { translate } from "@/core/i18n/translations";
+import { PwaRuntime } from "@/components/layout/PwaRuntime";
 
 export async function generateMetadata(): Promise<Metadata> {
   const locale = await getRequestLocale();
@@ -17,6 +18,7 @@ export default async function RootLayout({ children }: Readonly<{ children: Reac
     <html lang={locale}>
       <body>
         <LocaleProvider locale={locale}>
+          <PwaRuntime />
           <AppNavigation locale={locale} />
           {children}
         </LocaleProvider>

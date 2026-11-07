@@ -3,6 +3,7 @@ import { z } from "zod";
 import { rideLogStatuses } from "../db/schema";
 
 export const rideLogSchema = z.object({
+  id: z.string().uuid().optional(),
   visitDayId: z.string().min(1),
   rideId: z.string().min(1),
   status: z.enum(rideLogStatuses).default("RIDDEN"),

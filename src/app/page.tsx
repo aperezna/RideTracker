@@ -6,6 +6,8 @@ import { ParksWorldMap } from "@/components/features/dashboard/ParksWorldMap";
 import { TopRidesLeaderboard } from "@/components/features/dashboard/TopRidesLeaderboard";
 import { getRequestLocale } from "@/core/i18n/server";
 import { translate } from "@/core/i18n/translations";
+import { getAnalyticsData } from "@/core/db/analytics";
+import { AnalyticsPanel } from "@/components/features/dashboard/AnalyticsPanel";
 
 export const dynamic = "force-dynamic";
 
@@ -14,11 +16,12 @@ const emptyDashboard: DashboardView = { uniqueCoasterCount: 0, visitedParks: 0, 
 export default function Home() {
   let dashboard = emptyDashboard;
   try { dashboard = getDashboardData(); } catch { /* Empty database before first migration. */ }
+  const analytics = getAnalyticsData();
 
-  return <HomeContent dashboard={dashboard} />;
+  return <HomeContent dashboard={dashboard} analytics={analytics} />;
 }
 
-async function HomeContent({ dashboard }: { dashboard: DashboardView }) {
+async function HomeContent({ dashboard, analytics }: { dashboard: DashboardView; analytics: Awaited<ReturnType<typeof getAnalyticsData>> }) {
   const locale = await getRequestLocale();
   return (
     <main className="min-h-screen bg-[#0f131d] px-4 py-6 text-slate-100 sm:px-8 lg:px-12">
@@ -31,7 +34,8 @@ async function HomeContent({ dashboard }: { dashboard: DashboardView }) {
         <div className="mt-6 grid gap-6 xl:grid-cols-[1.35fr_1fr]">
           <ParksWorldMap parks={dashboard.parks} countries={dashboard.countries} />
            <TopRidesLeaderboard rides={dashboard.topRides} locale={locale} />
-        </div>
+         </div>
+         <AnalyticsPanel analytics={analytics} locale={locale} />
       </div>
     </main>
   );

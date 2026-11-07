@@ -16,7 +16,7 @@ async function requireSession(): Promise<void> {
 export async function recordRideCheckIn(input: unknown): Promise<string> {
   await requireSession();
   const log = rideLogSchema.parse(input);
-  const id = crypto.randomUUID();
+  const id = log.id ?? crypto.randomUUID();
   createRideLogRecord({ ...log, id });
   revalidatePath("/");
   revalidatePath(`/visits/${log.visitDayId}`);

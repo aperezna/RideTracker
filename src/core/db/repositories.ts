@@ -1,7 +1,7 @@
-import { and, asc, eq, inArray, isNull, lte, or, sql } from "drizzle-orm";
+import { and, asc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 
 import { db } from "./index";
-import { categoryEnrichmentJobs, parks, rideLogs, rides, visitDays } from "./schema";
+import { categoryEnrichmentJobs, parks, rideLogs, rides, visitDays, waitTimeObservations } from "./schema";
 import { transitionParkStatusOnFirstVisit } from "../domain/coaster-stats";
 import type { BackupInput } from "../validators/backup.schema";
 
@@ -9,6 +9,7 @@ type ParkRecord = typeof parks.$inferInsert;
 type RideRecord = typeof rides.$inferInsert;
 type VisitDayRecord = typeof visitDays.$inferInsert;
 type RideLogRecord = typeof rideLogs.$inferInsert;
+type WaitTimeObservationRecord = typeof waitTimeObservations.$inferInsert;
 
 export function importParkRecord(park: ParkRecord, importedRides: RideRecord[]): void {
   db.transaction((transaction) => {
@@ -227,7 +228,28 @@ export function createRideLogRecord(log: RideLogRecord): void {
   const context = db.select({ parkId: visitDays.parkId, rideParkId: rides.parkId })
     .from(visitDays).innerJoin(rides, eq(rides.id, log.rideId)).where(eq(visitDays.id, log.visitDayId)).get();
   if (!context || context.parkId !== context.rideParkId) throw new Error("Ride does not belong to the visit day park");
-  db.insert(rideLogs).values(log).run();
+  db.insert(rideLogs).values(log).onConflictDoNothing().run();
+}
+
+export type WaitTimeSnapshot = Pick<WaitTimeObservationRecord, "rideId" | "source" | "waitMinutes" | "isOpen">;
+
+export function recordWaitTimeSnapshots(snapshots: WaitTimeSnapshot[], observedAt = new Date()): void {
+  const recentThreshold = new Date(observedAt.getTime() - 5 * 60_000);
+  db.transaction((transaction) => {
+    for (const snapshot of snapshots) {
+      const recent = transaction.select({ id: waitTimeObservations.id })
+        .from(waitTimeObservations)
+        .where(and(
+          eq(waitTimeObservations.rideId, snapshot.rideId),
+          eq(waitTimeObservations.source, snapshot.source),
+          gt(waitTimeObservations.observedAt, recentThreshold),
+        ))
+        .limit(1)
+        .get();
+      if (recent) continue;
+      transaction.insert(waitTimeObservations).values({ id: crypto.randomUUID(), ...snapshot, observedAt }).run();
+    }
+  });
 }
 
 export function updateRideRatingRecord(rideId: string, rating: number, preferredRow: string | null | undefined, reviewNotes: string | null | undefined): string | undefined {
@@ -245,19 +267,22 @@ export function exportBackup(): BackupInput {
     rides: db.select().from(rides).all(),
     visitDays: db.select().from(visitDays).all(),
     rideLogs: db.select().from(rideLogs).all(),
+    waitTimeObservations: db.select().from(waitTimeObservations).all(),
   };
 }
 
 export function importBackup(backup: BackupInput, toDate: (value: string | number | Date) => Date): void {
   db.transaction((transaction) => {
     transaction.delete(rideLogs).run();
+    transaction.delete(waitTimeObservations).run();
     transaction.delete(visitDays).run();
     transaction.delete(categoryEnrichmentJobs).run();
     transaction.delete(rides).run();
     transaction.delete(parks).run();
     transaction.insert(parks).values(backup.parks.map((park) => ({ ...park, createdAt: toDate(park.createdAt) }))).run();
     transaction.insert(rides).values(backup.rides).run();
-    transaction.insert(visitDays).values(backup.visitDays.map((day) => ({ ...day, createdAt: toDate(day.createdAt) }))).run();
+    transaction.insert(visitDays).values(backup.visitDays.map((day) => ({ ...day, durationMinutes: day.durationMinutes ?? null, weather: day.weather ?? null, company: day.company ?? null, overallRating: day.overallRating ?? null, createdAt: toDate(day.createdAt) }))).run();
     transaction.insert(rideLogs).values(backup.rideLogs).run();
+    if (backup.waitTimeObservations) transaction.insert(waitTimeObservations).values(backup.waitTimeObservations.map((observation) => ({ ...observation, observedAt: toDate(observation.observedAt) }))).run();
   });
 }
