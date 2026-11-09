@@ -3,7 +3,8 @@
 import "leaflet/dist/leaflet.css";
 
 import Link from "next/link";
-import { CircleMarker, MapContainer, Popup, TileLayer } from "react-leaflet";
+import { useEffect } from "react";
+import { CircleMarker, MapContainer, Popup, TileLayer, useMap } from "react-leaflet";
 
 import type { DomainPark } from "@/core/domain/dashboard-stats";
 import { useLocale } from "@/components/i18n/LocaleProvider";
@@ -13,6 +14,22 @@ type LeafletParksMapProps = { parks: DomainPark[] };
 
 const statusColors = { VISITED: "#34d399", PLANNED: "#fbbf24", WISHLIST: "#22d3ee" } as const;
 
+function ParksViewport({ parks }: { parks: DomainPark[] }) {
+  const map = useMap();
+
+  useEffect(() => {
+    const coordinates = parks
+      .filter(({ latitude, longitude }) => Number.isFinite(latitude) && Number.isFinite(longitude))
+      .map(({ latitude, longitude }) => [latitude, longitude] as [number, number]);
+
+    if (coordinates.length > 0) {
+      map.fitBounds(coordinates, { padding: [24, 24], maxZoom: 5 });
+    }
+  }, [map, parks]);
+
+  return null;
+}
+
 export default function LeafletParksMap({ parks }: LeafletParksMapProps) {
   const { t } = useLocale();
   return (
@@ -21,6 +38,7 @@ export default function LeafletParksMap({ parks }: LeafletParksMapProps) {
         attribution="&copy; OpenStreetMap contributors"
         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
       />
+      <ParksViewport parks={parks} />
       {parks.map((park) => (
         <CircleMarker
           key={park.id}
