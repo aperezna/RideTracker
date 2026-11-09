@@ -33,6 +33,9 @@ export type RideDetailData = RideInventoryData & {
   reviewNotes: string | null;
   experience: string | null;
   storytelling: string | null;
+  fieldSources: Array<{ field: string; source: string; sourceUrl: string | null }>;
+  aliases: string[];
+  manualFields: string[];
 };
 
 export type VisitHistoryData = {

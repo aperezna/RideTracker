@@ -1,7 +1,7 @@
 import { and, asc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 
 import { db } from "./index";
-import { categoryEnrichmentJobs, parks, rideLogs, rides, visitDays, waitTimeObservations } from "./schema";
+import { categoryEnrichmentJobs, enrichmentSourceFailures, parks, parkOfficialLinks, rideAliases, rideFieldSources, rideLogs, rides, visitDays, waitTimeObservations } from "./schema";
 import { transitionParkStatusOnFirstVisit } from "../domain/coaster-stats";
 import type { BackupInput } from "../validators/backup.schema";
 
@@ -40,13 +40,20 @@ export function updateParkStatusRecord(parkId: string, status: typeof parks.$inf
   db.update(parks).set({ status }).where(eq(parks.id, parkId)).run();
 }
 
-export function deleteParkRecord(parkId: string): void {
-  db.transaction((transaction) => {
+export function deleteParkRecord(parkId: string, database: typeof db = db): void {
+  database.transaction((transaction) => {
     const rideIds = transaction.select({ id: rides.id }).from(rides).where(eq(rides.parkId, parkId)).all().map((ride) => ride.id);
     const visitDayIds = transaction.select({ id: visitDays.id }).from(visitDays).where(eq(visitDays.parkId, parkId)).all().map((visitDay) => visitDay.id);
     if (rideIds.length > 0) transaction.delete(rideLogs).where(inArray(rideLogs.rideId, rideIds)).run();
     if (visitDayIds.length > 0) transaction.delete(rideLogs).where(inArray(rideLogs.visitDayId, visitDayIds)).run();
+    if (rideIds.length > 0) {
+      transaction.delete(waitTimeObservations).where(inArray(waitTimeObservations.rideId, rideIds)).run();
+      transaction.delete(rideFieldSources).where(inArray(rideFieldSources.rideId, rideIds)).run();
+      transaction.delete(rideAliases).where(inArray(rideAliases.rideId, rideIds)).run();
+      transaction.delete(enrichmentSourceFailures).where(inArray(enrichmentSourceFailures.scopeKey, rideIds)).run();
+    }
     transaction.delete(categoryEnrichmentJobs).where(eq(categoryEnrichmentJobs.parkId, parkId)).run();
+    transaction.delete(parkOfficialLinks).where(eq(parkOfficialLinks.parkId, parkId)).run();
     transaction.delete(visitDays).where(eq(visitDays.parkId, parkId)).run();
     transaction.delete(rides).where(eq(rides.parkId, parkId)).run();
     transaction.delete(parks).where(eq(parks.id, parkId)).run();
@@ -180,15 +187,73 @@ export function updateRideCategoryRecord(rideId: string, category: typeof rides.
 }
 
 export function updateRideEnrichmentRecord(rideId: string, category: typeof rides.$inferInsert.category | null, photoUrl: string | null, photoSourceUrl: string | null, experience: string | null, storytelling: string | null): void {
+  const control = db.select({ categoryManual: rides.categoryManual, manufacturerManual: rides.manufacturerManual, experienceManual: rides.experienceManual, storytellingManual: rides.storytellingManual, photoManual: rides.photoManual })
+    .from(rides).where(eq(rides.id, rideId)).get();
+  if (!control) return;
   const updates = {
-    ...(category && category !== "UNKNOWN" ? { category } : {}),
-    ...(photoUrl ? { photoUrl } : {}),
-    ...(photoSourceUrl ? { photoSourceUrl } : {}),
-    ...(experience ? { experience } : {}),
-    ...(storytelling ? { storytelling } : {}),
+    ...(!control.categoryManual && category && category !== "UNKNOWN" ? { category } : {}),
+    ...(!control.photoManual && photoUrl ? { photoUrl } : {}),
+    ...(!control.photoManual && photoSourceUrl ? { photoSourceUrl } : {}),
+    ...(!control.experienceManual && experience ? { experience } : {}),
+    ...(!control.storytellingManual && storytelling ? { storytelling } : {}),
   };
   if (Object.keys(updates).length === 0) return;
   db.update(rides).set(updates).where(eq(rides.id, rideId)).run();
+}
+
+export type ManualRideFields = Partial<Pick<typeof rides.$inferInsert, "category" | "manufacturer" | "experience" | "storytelling">>;
+
+export function updateRideManualFields(rideId: string, fields: ManualRideFields): string | undefined {
+  const updates = {
+    ...(fields.category !== undefined ? { category: fields.category, categoryManual: true } : {}),
+    ...(fields.manufacturer !== undefined ? { manufacturer: fields.manufacturer, manufacturerManual: true } : {}),
+    ...(fields.experience !== undefined ? { experience: fields.experience, experienceManual: true } : {}),
+    ...(fields.storytelling !== undefined ? { storytelling: fields.storytelling, storytellingManual: true } : {}),
+  };
+  if (Object.keys(updates).length === 0) return undefined;
+  db.update(rides).set(updates).where(eq(rides.id, rideId)).run();
+  return db.select({ parkId: rides.parkId }).from(rides).where(eq(rides.id, rideId)).get()?.parkId;
+}
+
+export function recordRideFieldSources(rideId: string, sources: Array<{ field: string; source: string; sourceUrl?: string | null }>): void {
+  db.transaction((transaction) => {
+    for (const source of sources) {
+      transaction.delete(rideFieldSources).where(and(eq(rideFieldSources.rideId, rideId), eq(rideFieldSources.field, source.field))).run();
+      transaction.insert(rideFieldSources).values({ id: crypto.randomUUID(), rideId, field: source.field, source: source.source, sourceUrl: source.sourceUrl ?? null, observedAt: new Date() }).run();
+    }
+  });
+}
+
+export function isEnrichmentCoolingDown(source: string, scopeKey: string, now = new Date()): boolean {
+  const failure = db.select({ retryAfter: enrichmentSourceFailures.retryAfter }).from(enrichmentSourceFailures)
+    .where(and(eq(enrichmentSourceFailures.source, source), eq(enrichmentSourceFailures.scopeKey, scopeKey))).get();
+  return Boolean(failure && failure.retryAfter > now);
+}
+
+export function recordEnrichmentFailure(source: string, scopeKey: string, error: string): void {
+  const id = `${source}:${scopeKey}`;
+  const previous = db.select().from(enrichmentSourceFailures).where(eq(enrichmentSourceFailures.id, id)).get();
+  const attempts = (previous?.attempts ?? 0) + 1;
+  const now = new Date();
+  const retryAfter = new Date(now.getTime() + Math.min(60_000 * 2 ** Math.min(attempts, 5), 3_600_000));
+  db.insert(enrichmentSourceFailures).values({ id, source, scopeKey, attempts, lastError: error.slice(0, 500), retryAfter, updatedAt: now })
+    .onConflictDoUpdate({ target: enrichmentSourceFailures.id, set: { attempts, lastError: error.slice(0, 500), retryAfter, updatedAt: now } }).run();
+}
+
+export function clearEnrichmentFailure(source: string, scopeKey: string): void {
+  db.delete(enrichmentSourceFailures).where(and(eq(enrichmentSourceFailures.source, source), eq(enrichmentSourceFailures.scopeKey, scopeKey))).run();
+}
+
+export function addRideAlias(rideId: string, alias: string, source: string | null = null, verified = false): void {
+  const normalized = alias.trim();
+  if (!normalized) throw new Error("Alias is required");
+  db.insert(rideAliases).values({ id: crypto.randomUUID(), rideId, alias: normalized, source, verified }).run();
+}
+
+export function addVerifiedParkOfficialLink(parkId: string, label: string, url: string): void {
+  const parsed = new URL(url);
+  if (parsed.protocol !== "https:") throw new Error("Official links must use HTTPS");
+  db.insert(parkOfficialLinks).values({ id: crypto.randomUUID(), parkId, label: label.trim(), url: parsed.toString(), verifiedAt: new Date() }).run();
 }
 
 export function completeRideCategoryJob(jobId: string): void {

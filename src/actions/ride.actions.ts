@@ -2,10 +2,11 @@
 
 import { revalidatePath } from "next/cache";
 import { cookies } from "next/headers";
-import { createRideLogRecord, createRideRecord, updateRideRatingRecord } from "@/core/db/repositories";
+import { createRideLogRecord, createRideRecord, updateRideManualFields, updateRideRatingRecord } from "@/core/db/repositories";
 import { rideSchema } from "@/core/validators/ride.schema";
 import { rideLogSchema } from "@/core/validators/ride-log.schema";
 import { rideRatingSchema } from "@/core/validators/ride-rating.schema";
+import { rideEnrichmentUpdateSchema } from "@/core/validators/ride-enrichment.schema";
 import { isValidSessionToken, SESSION_COOKIE_NAME } from "@/core/auth/session";
 
 async function requireSession(): Promise<void> {
@@ -38,4 +39,15 @@ export async function updateRideRating(input: unknown): Promise<void> {
   const parkId = updateRideRatingRecord(rating.rideId, rating.rating, rating.preferredRow, rating.reviewNotes);
   revalidatePath("/");
   if (parkId) revalidatePath(`/parks/${parkId}`);
+}
+
+export async function updateRideEnrichment(input: unknown): Promise<void> {
+  await requireSession();
+  const update = rideEnrichmentUpdateSchema.parse(input);
+  const parkId = updateRideManualFields(update.rideId, update);
+  revalidatePath("/");
+  if (parkId) {
+    revalidatePath(`/parks/${parkId}`);
+    revalidatePath(`/parks/${parkId}/rides/${update.rideId}`);
+  }
 }

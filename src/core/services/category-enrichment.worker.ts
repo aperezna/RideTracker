@@ -6,6 +6,10 @@ import {
   recoverAllStaleRideCategoryJobs,
   recoverStaleRideCategoryJobs,
   retryRideCategoryJob,
+  clearEnrichmentFailure,
+  isEnrichmentCoolingDown,
+  recordEnrichmentFailure,
+  recordRideFieldSources,
   updateRideEnrichmentRecord,
 } from "@/core/db/repositories";
 import { getRideEnrichment } from "./wikimedia.service";
@@ -45,13 +49,27 @@ async function processCategoryEnrichmentQueue(parkId: string): Promise<void> {
     const job = claimNextRideCategoryJob(parkId);
     if (!job) return;
     try {
+      const scopeKey = job.rideId;
+      if (isEnrichmentCoolingDown("catalog-enrichment", scopeKey)) {
+        retryRideCategoryJob(job, "Enrichment source cooldown active", MAX_ATTEMPTS);
+        continue;
+      }
       const enrichment = await getRideEnrichment(job.rideName, job.parkName, "en");
       if (!enrichment?.category && !enrichment?.photoUrl && !enrichment?.experience && !enrichment?.storytelling) throw new Error("No ride enrichment source provided data");
       updateRideEnrichmentRecord(job.rideId, enrichment.category, enrichment.photoUrl, enrichment.sourceUrl, enrichment.experience, enrichment.storytelling);
+      const source = enrichment.sourceUrl?.includes("wikidata") ? "Wikidata" : enrichment.sourceUrl?.includes("rcdb") ? "RCDB" : "Wikimedia";
+      recordRideFieldSources(job.rideId, [
+        ...(enrichment.category ? [{ field: "category", source, sourceUrl: enrichment.sourceUrl }] : []),
+        ...(enrichment.photoUrl ? [{ field: "photo", source, sourceUrl: enrichment.sourceUrl }] : []),
+        ...(enrichment.experience ? [{ field: "experience", source, sourceUrl: enrichment.sourceUrl }] : []),
+        ...(enrichment.storytelling ? [{ field: "storytelling", source, sourceUrl: enrichment.sourceUrl }] : []),
+      ]);
+      clearEnrichmentFailure("catalog-enrichment", scopeKey);
       completeRideCategoryJob(job.id);
       console.info(JSON.stringify({ event: "enrichment_job_completed", ride: job.rideName, park: job.parkName, category: enrichment.category ?? null, photo: Boolean(enrichment.photoUrl) }));
     } catch (error) {
       const message = error instanceof Error ? error.message : "unknown error";
+      recordEnrichmentFailure("catalog-enrichment", job.rideId, message);
       retryRideCategoryJob(job, message, MAX_ATTEMPTS);
       console.warn(JSON.stringify({ event: "enrichment_job_failed", ride: job.rideName, park: job.parkName, attempt: job.attempts + 1, maxAttempts: MAX_ATTEMPTS, error: message }));
     }

@@ -2,7 +2,7 @@ import { desc, eq } from "drizzle-orm";
 
 import type { ParkDetailData, ParkCardData, RideDetailData } from "../domain/park-views";
 import { db } from "./index";
-import { parks, rideLogs, rides, visitDays } from "./schema";
+import { parks, rideAliases, rideFieldSources, rideLogs, rides, visitDays } from "./schema";
 
 export function getParkCatalogData(): ParkCardData[] {
   const parkRows = db.select().from(parks).orderBy(desc(parks.createdAt)).all();
@@ -84,6 +84,8 @@ export function getRideDetailData(parkId: string, rideId: string): RideDetailDat
   const ride = db.select().from(rides).where(eq(rides.id, rideId)).get();
   if (!park || !ride || ride.parkId !== park.id) return null;
   const logs = db.select({ lapCount: rideLogs.lapCount }).from(rideLogs).where(eq(rideLogs.rideId, ride.id)).all();
+  const fieldSources = db.select({ field: rideFieldSources.field, source: rideFieldSources.source, sourceUrl: rideFieldSources.sourceUrl }).from(rideFieldSources).where(eq(rideFieldSources.rideId, ride.id)).all();
+  const aliases = db.select({ alias: rideAliases.alias }).from(rideAliases).where(eq(rideAliases.rideId, ride.id)).all().map(({ alias }) => alias);
   return {
     id: ride.id,
     parkId: park.id,
@@ -101,6 +103,14 @@ export function getRideDetailData(parkId: string, rideId: string): RideDetailDat
     reviewNotes: ride.reviewNotes,
     experience: ride.experience,
     storytelling: ride.storytelling,
+    fieldSources,
+    aliases,
+    manualFields: [
+      ...(ride.categoryManual ? ["category"] : []),
+      ...(ride.manufacturerManual ? ["manufacturer"] : []),
+      ...(ride.experienceManual ? ["experience"] : []),
+      ...(ride.storytellingManual ? ["storytelling"] : []),
+    ],
     totalTrips: logs.length,
     totalLaps: logs.reduce((sum, log) => sum + log.lapCount, 0),
   };

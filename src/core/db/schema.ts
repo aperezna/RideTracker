@@ -29,6 +29,11 @@ export const rides = sqliteTable("rides", {
   photoSourceUrl: text("photo_source_url"),
   experience: text("experience"),
   storytelling: text("storytelling"),
+  categoryManual: integer("category_manual", { mode: "boolean" }).notNull().default(false),
+  manufacturerManual: integer("manufacturer_manual", { mode: "boolean" }).notNull().default(false),
+  experienceManual: integer("experience_manual", { mode: "boolean" }).notNull().default(false),
+  storytellingManual: integer("storytelling_manual", { mode: "boolean" }).notNull().default(false),
+  photoManual: integer("photo_manual", { mode: "boolean" }).notNull().default(false),
   rating: real("rating"),
   preferredRow: text("preferred_row"),
   reviewNotes: text("review_notes"),
@@ -63,6 +68,41 @@ export const waitTimeObservations = sqliteTable("wait_time_observations", {
   waitMinutes: integer("wait_minutes"),
   isOpen: integer("is_open", { mode: "boolean" }),
   observedAt: integer("observed_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+export const rideFieldSources = sqliteTable("ride_field_sources", {
+  id: text("id").primaryKey(),
+  rideId: text("ride_id").notNull().references(() => rides.id),
+  field: text("field").notNull(),
+  source: text("source").notNull(),
+  sourceUrl: text("source_url"),
+  observedAt: integer("observed_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+export const rideAliases = sqliteTable("ride_aliases", {
+  id: text("id").primaryKey(),
+  rideId: text("ride_id").notNull().references(() => rides.id),
+  alias: text("alias").notNull(),
+  source: text("source"),
+  verified: integer("verified", { mode: "boolean" }).notNull().default(false),
+});
+
+export const enrichmentSourceFailures = sqliteTable("enrichment_source_failures", {
+  id: text("id").primaryKey(),
+  source: text("source").notNull(),
+  scopeKey: text("scope_key").notNull(),
+  attempts: integer("attempts").notNull().default(0),
+  lastError: text("last_error"),
+  retryAfter: integer("retry_after", { mode: "timestamp_ms" }).notNull(),
+  updatedAt: integer("updated_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+export const parkOfficialLinks = sqliteTable("park_official_links", {
+  id: text("id").primaryKey(),
+  parkId: text("park_id").notNull().references(() => parks.id),
+  label: text("label").notNull(),
+  url: text("url").notNull(),
+  verifiedAt: integer("verified_at", { mode: "timestamp_ms" }).notNull(),
 });
 
 export const categoryEnrichmentJobs = sqliteTable("category_enrichment_jobs", {

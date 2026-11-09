@@ -58,6 +58,22 @@ function ensureSchema(client: Database.Database): void {
       is_open INTEGER,
       observed_at INTEGER NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS ride_field_sources (
+      id TEXT PRIMARY KEY, ride_id TEXT NOT NULL REFERENCES rides(id), field TEXT NOT NULL,
+      source TEXT NOT NULL, source_url TEXT, observed_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS ride_aliases (
+      id TEXT PRIMARY KEY, ride_id TEXT NOT NULL REFERENCES rides(id), alias TEXT NOT NULL,
+      source TEXT, verified INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE IF NOT EXISTS enrichment_source_failures (
+      id TEXT PRIMARY KEY, source TEXT NOT NULL, scope_key TEXT NOT NULL,
+      attempts INTEGER NOT NULL DEFAULT 0, last_error TEXT, retry_after INTEGER NOT NULL, updated_at INTEGER NOT NULL
+    );
+    CREATE TABLE IF NOT EXISTS park_official_links (
+      id TEXT PRIMARY KEY, park_id TEXT NOT NULL REFERENCES parks(id), label TEXT NOT NULL,
+      url TEXT NOT NULL, verified_at INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS category_enrichment_jobs (
       id TEXT PRIMARY KEY,
       park_id TEXT NOT NULL REFERENCES parks(id),
@@ -83,6 +99,11 @@ function ensureSchema(client: Database.Database): void {
   addColumnIfMissing("rides", "photo_source_url", "TEXT");
   addColumnIfMissing("rides", "experience", "TEXT");
   addColumnIfMissing("rides", "storytelling", "TEXT");
+  addColumnIfMissing("rides", "category_manual", "INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing("rides", "manufacturer_manual", "INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing("rides", "experience_manual", "INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing("rides", "storytelling_manual", "INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing("rides", "photo_manual", "INTEGER NOT NULL DEFAULT 0");
   addColumnIfMissing("visit_days", "duration_minutes", "INTEGER");
   addColumnIfMissing("visit_days", "weather", "TEXT");
   addColumnIfMissing("visit_days", "company", "TEXT");
