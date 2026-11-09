@@ -20,8 +20,8 @@ async function sign(value: string, secret: string): Promise<string> {
 }
 
 function sessionSecret(): string {
-  const secret = process.env.APP_SESSION_SECRET ?? process.env.APP_MASTER_PASSWORD;
-  if (!secret) throw new Error("APP_MASTER_PASSWORD is not configured");
+  const secret = process.env.APP_SESSION_SECRET;
+  if (!secret) throw new Error("APP_SESSION_SECRET is not configured");
   return secret;
 }
 

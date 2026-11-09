@@ -17,12 +17,13 @@ import { db } from "./index";
 import { eq } from "drizzle-orm";
 import { parks, rideLogs, rides } from "./schema";
 
-export function getDashboardData(userId: string): DashboardView {
-  const parkRows = db.select().from(parks).where(eq(parks.userId, userId)).all();
-  const rideRows = db.select().from(rides).innerJoin(parks, eq(parks.id, rides.parkId)).where(eq(parks.userId, userId)).all().map(({ rides: ride }) => ride);
-  const logRows = db
+export function getDashboardData(userId: string, database = db): DashboardView {
+  const parkRows = database.select().from(parks).where(eq(parks.userId, userId)).all();
+  const rideRows = database.select().from(rides).innerJoin(parks, eq(parks.id, rides.parkId)).where(eq(parks.userId, userId)).all().map(({ rides: ride }) => ride);
+  const logRows = database
     .select({ rideId: rideLogs.rideId, status: rideLogs.status, lapCount: rideLogs.lapCount })
     .from(rideLogs)
+    .innerJoin(rides, eq(rides.id, rideLogs.rideId))
     .innerJoin(parks, eq(parks.id, rides.parkId))
     .where(eq(parks.userId, userId))
     .all();

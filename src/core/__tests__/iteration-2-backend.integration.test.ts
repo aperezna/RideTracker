@@ -5,6 +5,7 @@ import { parks, rideAliases, rideFieldSources, rideLogs, rides, users, visitDays
 import { calculateTopTen, calculateUniqueCoasterCount } from "@/core/domain/coaster-stats";
 import { transitionParkStatusOnFirstVisit } from "@/core/domain/coaster-stats";
 import { getParkCatalogData } from "@/core/db/parks";
+import { getDashboardData } from "@/core/db/dashboard";
 
 function createSchema(connection: ReturnType<typeof createDatabase>): void {
   connection.client.exec(`
@@ -108,6 +109,23 @@ describe("Iteration 2 SQLite persistence", () => {
       { id: "park-2", userId: "user-2", name: "Private Two", country: "US", city: "Orlando", latitude: 28, longitude: -81, status: "PLANNED", createdAt },
     ]).run();
     expect(getParkCatalogData("user-1", connection.db).map((park) => park.name)).toEqual(["Private One"]);
+    connection.client.close();
+  });
+
+  it("includes only the requesting user's ride logs in the dashboard", () => {
+    const connection = createDatabase(":memory:");
+    createSchema(connection);
+    const createdAt = new Date("2026-12-30T00:00:00.000Z");
+    connection.db.insert(users).values({ id: "user-1", email: "one@example.com", passwordHash: "hash", createdAt }).run();
+    connection.db.insert(parks).values({ id: "park-1", userId: "user-1", name: "Efteling", country: "NL", city: "Kaatsheuvel", latitude: 51.650278, longitude: 5.048056, status: "VISITED", createdAt }).run();
+    connection.db.insert(rides).values({ id: "ride-1", parkId: "park-1", name: "Coaster", category: "COASTER" }).run();
+    connection.db.insert(visitDays).values({ id: "day-1", parkId: "park-1", visitDate: "2026-12-30", createdAt }).run();
+    connection.db.insert(rideLogs).values({ id: "log-1", visitDayId: "day-1", rideId: "ride-1", status: "RIDDEN", lapCount: 1 }).run();
+
+    const dashboard = getDashboardData("user-1", connection.db);
+
+    expect(dashboard.parks).toEqual([{ id: "park-1", name: "Efteling", country: "NL", latitude: 51.650278, longitude: 5.048056, status: "VISITED" }]);
+    expect(dashboard.totalLaps).toBe(1);
     connection.client.close();
   });
 

@@ -4,8 +4,8 @@ set -Eeuo pipefail
 APP_DIR="${RIDE_TRACKER_DIR:-$HOME/ridetracker}"
 APP_URL="${RIDE_TRACKER_URL:-http://localhost:3000}"
 
-if [[ -z "${APP_MASTER_PASSWORD:-}" ]]; then
-  echo "APP_MASTER_PASSWORD must be set in the server shell." >&2
+if [[ -z "${APP_SESSION_SECRET:-}" ]]; then
+  echo "APP_SESSION_SECRET must be set in the server shell." >&2
   exit 1
 fi
 

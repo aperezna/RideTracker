@@ -2,7 +2,7 @@
 
 RideTracker is a self-hosted personal theme-park and attraction tracker. It combines a SQLite-backed catalog, park planning, editable visit history, attraction experiences, ratings, an interactive world map, live queue data, progressive enrichment, and a production-ready Docker image.
 
-The current release is designed for a single private instance: one master password protects the application and SQLite stores the data locally in `./data`.
+The current release supports multiple user accounts: each user signs in with an email and password, and SQLite stores the data locally in `./data`.
 
 ## Quick start with Docker
 
@@ -16,7 +16,7 @@ The current release is designed for a single private instance: one master passwo
 From the repository root:
 
 ```powershell
-$env:APP_MASTER_PASSWORD = "change-this-password"
+$env:APP_SESSION_SECRET = "generate-a-long-random-secret"
 docker compose up -d --build
 ```
 
@@ -49,21 +49,21 @@ Stopping the stack does not delete `./data`.
 
 | Variable | Required | Default | Description |
 | --- | --- | --- | --- |
-| `APP_MASTER_PASSWORD` | Yes | — | Password used by the login screen and session authentication. |
+| `APP_SESSION_SECRET` | Yes | — | Long random secret used to sign HTTP-only user session cookies. It is not a login password. |
 | `DATABASE_URL` | No | `/app/data/coastervault.db` in Docker | SQLite database path inside the container. |
 | `QUEUE_TIMES_BASE_URL` | No | `https://queue-times.com` | Override the Queue-Times API base URL for testing or a compatible service. |
 | `NODE_ENV` | No | `production` in Docker | Next.js runtime mode. |
 | `ENRICHMENT_HEARTBEAT_PATH` | No | `/app/data/enrichment-worker.heartbeat` | Worker heartbeat file used by the Docker healthcheck. |
 
-Do not commit real passwords, `.env` files, SQLite data, or generated `.atl/` files. For repeatable local runs, set the password in the shell that invokes Compose or use a secrets manager in the deployment environment.
+Do not commit real secrets, `.env` files, SQLite data, or generated `.atl/` files. Set `APP_SESSION_SECRET` in the shell that invokes Compose or use a secrets manager in the deployment environment.
 
 ## Using the application
 
 ### Authentication
 
 1. Open the application URL.
-2. Enter `APP_MASTER_PASSWORD` on `/login`.
-3. RideTracker creates an HTTP-only session cookie.
+2. Enter your registered email and password on `/login`.
+3. RideTracker verifies the stored password hash and creates an HTTP-only session cookie.
 
 Unauthenticated page requests redirect to `/login`; unauthenticated API requests return `401 Unauthorized`.
 
@@ -282,7 +282,7 @@ The v1.0.0 runtime baseline was measured at 38.61 MiB RAM, 151 ms maximum observ
 
 ## Security notes
 
-- `APP_MASTER_PASSWORD` is required; never use the documented example value in production.
+- `APP_SESSION_SECRET` is required and must be a long random value; it is separate from user login passwords.
 - Session cookies are HTTP-only and use `SameSite=Lax`.
 - The production container does not run the application process as root.
 - API and server-action paths validate the session independently of page middleware.
