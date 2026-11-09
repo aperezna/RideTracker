@@ -67,6 +67,91 @@ Do not commit real secrets, `.env` files, SQLite data, or generated `.atl/` file
 
 Unauthenticated page requests redirect to `/login`; unauthenticated API requests return `401 Unauthorized`.
 
+## Manual de usuario
+
+Esta sección describe el flujo normal para utilizar RideTracker desde el navegador.
+
+### 1. Crear una cuenta e iniciar sesión
+
+1. Abre la dirección de RideTracker y selecciona **Crear cuenta**.
+2. Introduce tu email y una contraseña de al menos 10 caracteres.
+3. Tras registrarte, la aplicación inicia tu sesión automáticamente.
+4. En sesiones posteriores, utiliza tu email y contraseña en `/login`.
+5. Para cerrar la sesión, selecciona **Cerrar sesión** en la navegación superior.
+
+Cada cuenta tiene sus propios parques, visitas, atracciones, valoraciones y estadísticas. Los datos de otros usuarios no aparecen en tu dashboard ni en tu catálogo.
+
+### 2. Añadir parques
+
+1. Abre **Parks** desde la navegación principal.
+2. Para importar un parque, utiliza la búsqueda del catálogo de Queue-Times y selecciona **Importar**. La importación incluye los datos disponibles y sus atracciones.
+3. Para crear un parque manualmente, selecciona la opción de alta manual e introduce como mínimo nombre, país, ciudad, latitud y longitud.
+4. Define el estado del parque: **Wishlist**, **Planned** o **Visited**.
+5. Usa el buscador y los filtros para localizar tus parques.
+
+Los parques manuales necesitan latitud y longitud válidas para aparecer en el mapa del dashboard.
+
+### 3. Consultar el dashboard
+
+El dashboard (`/`) muestra:
+
+- Resumen de parques visitados, planificados y guardados en wishlist.
+- Número de atracciones únicas, vueltas registradas y principales atracciones.
+- Mapa con los parques de tu cuenta. El mapa ajusta automáticamente el encuadre a los puntos disponibles.
+- Resumen por país y estadísticas de visitas, experiencias, vueltas y tiempos de espera.
+
+Selecciona una atracción del ranking o un parque del mapa para abrir su detalle.
+
+### 4. Consultar un parque y sus atracciones
+
+En la página de detalle de un parque puedes:
+
+- Consultar el inventario de atracciones.
+- Ver el estado de apertura y el tiempo de espera cuando las fuentes externas proporcionan datos.
+- Revisar el historial de visitas.
+- Iniciar una visita con una fecha concreta.
+- Abrir una atracción para guardar valoración, fila preferida y notas.
+
+Los datos externos pueden tardar en aparecer o no estar disponibles si el proveedor está caído, limita peticiones o no reconoce el parque.
+
+### 5. Registrar una visita y hacer check-in
+
+1. Desde un parque, selecciona **Iniciar visita**.
+2. Elige la fecha; también puedes registrar una visita histórica.
+3. Completa los datos opcionales de la jornada: duración, clima, compañía, valoración general y notas.
+4. En cada atracción, ajusta el número de vueltas y pulsa **Check-in**.
+5. Puedes añadir más atracciones a la visita desde su página.
+6. Revisa o edita los datos de la jornada desde el encabezado de la visita.
+
+La visita de parque y cada experiencia en una atracción se almacenan por separado. Si registras la primera visita de un parque planificado, su estado pasa automáticamente a **Visited**.
+
+### 6. Usar la aplicación sin conexión
+
+Durante una visita, si pierdes la conexión:
+
+1. Continúa utilizando **Check-in** en las atracciones.
+2. RideTracker guarda temporalmente los check-ins en el navegador.
+3. El indicador de la navegación muestra el estado offline y el número de operaciones pendientes.
+4. Cuando vuelva la conexión, la cola se sincroniza automáticamente.
+
+La captura offline está disponible para check-ins. Importar parques, actualizar el catálogo y consultar proveedores externos requiere conexión con el servidor.
+
+### 7. Exportar tus datos
+
+Con la sesión iniciada, puedes descargar tus datos desde:
+
+- JSON: `/api/export?format=json`
+- CSV: `/api/export?format=csv`
+
+Las exportaciones están limitadas a los datos de la cuenta autenticada.
+
+### 8. Idioma y privacidad
+
+- Cambia el idioma desde el selector de la navegación superior.
+- Cierra la sesión al utilizar un dispositivo compartido.
+- No compartas tu contraseña ni el contenido de tu sesión.
+- Si se cambia la clave técnica `APP_SESSION_SECRET` del servidor, todas las sesiones existentes caducan y será necesario iniciar sesión de nuevo.
+
 ### Main navigation
 
 The global navigation provides:
