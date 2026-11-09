@@ -232,7 +232,7 @@ On Windows, native `better-sqlite3` builds may require Visual Studio with the **
 npm run dev
 ```
 
-Set `APP_MASTER_PASSWORD` and `DATABASE_URL` before starting the server. The default local database path is `./data/coastervault.db`.
+Set `APP_SESSION_SECRET` and `DATABASE_URL` before starting the server. The default local database path is `./data/coastervault.db`.
 
 ### Available scripts
 
@@ -259,7 +259,7 @@ Before considering a release ready:
 
 ```powershell
 docker compose down
-$env:APP_MASTER_PASSWORD = "change-this-password"
+$env:APP_SESSION_SECRET = "generate-a-long-random-secret"
 docker compose up -d --build
 docker compose ps
 docker compose logs --tail 100 ridetracker

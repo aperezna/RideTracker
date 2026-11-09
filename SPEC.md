@@ -27,7 +27,7 @@ Aplicación web individual (Mobile-First PWA + Desktop Command Center) para gest
 * **[RNF-02] Docker Multi-Arch Ligero:** `Dockerfile` standalone (`node:22-alpine`) compatible con `linux/amd64` y `linux/arm64`, consumo < 250MB RAM.
 * **[RNF-03] Persistencia SQLite ACID & Backup:** Base de datos `better-sqlite3` en modo WAL (`pragma journal_mode = WAL`) alojada en `/app/data/coastervault.db` + endpoint de Export/Import JSON completo.
 * **[RNF-04] Latencia y Caché Server-Side:** Dashboard SSR/ISR < 200ms; llamadas al catálogo externo exclusivamente vía Route Handlers/Server Actions con timeout de 5s.
-* **[RNF-05] Seguridad Single-User:** Middleware de protección con contraseña maestra (`APP_MASTER_PASSWORD`) y sesión en cookie `HttpOnly`, `SameSite=Lax`.
+* **[RNF-05] Seguridad Multiusuario:** Autenticación por usuario mediante email y contraseña almacenada como hash, sesiones firmadas con `APP_SESSION_SECRET` en cookie `HttpOnly`, `SameSite=Lax`, y aislamiento de datos por usuario.
 * **[RNF-06] Calidad y Tipado Estricto:** TypeScript `strict: true`, validación en frontera con Zod y cobertura de tests unitarios en Vitest para cálculos de dominio (`Coaster Count`, transición de estado y `Top 10`).
 
 ## 4. Especificación UI y Handoff de Google Stitch (`[UI-XX]`)
