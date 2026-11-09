@@ -1,7 +1,6 @@
-import { cookies } from "next/headers";
 import { NextResponse } from "next/server";
 import { getAnalyticsExportData } from "@/core/db/analytics";
-import { isValidSessionToken, SESSION_COOKIE_NAME } from "@/core/auth/session";
+import { requireCurrentUserId } from "@/core/auth/current-user";
 
 function csvCell(value: unknown): string {
   const text = value === null || value === undefined ? "" : String(value);
@@ -23,10 +22,9 @@ function toCsv(data: ReturnType<typeof getAnalyticsExportData>): string {
 }
 
 export async function GET(request: Request): Promise<NextResponse> {
-  const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
-  if (!(await isValidSessionToken(token))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await requireCurrentUserId();
   const format = new URL(request.url).searchParams.get("format") ?? "json";
-  const data = getAnalyticsExportData();
+  const data = getAnalyticsExportData(userId);
   if (format === "csv") {
     return new NextResponse(toCsv(data), { headers: { "Content-Type": "text/csv; charset=utf-8", "Content-Disposition": "attachment; filename=ridetracker-analytics.csv" } });
   }

@@ -4,10 +4,6 @@ import type { NextRequest } from "next/server";
 import { isValidSessionToken, SESSION_COOKIE_NAME } from "@/core/auth/session";
 
 export async function middleware(request: NextRequest) {
-  if (!process.env.APP_MASTER_PASSWORD) {
-    return NextResponse.json({ error: "Authentication is not configured" }, { status: 503 });
-  }
-
   const authenticated = await isValidSessionToken(request.cookies.get(SESSION_COOKIE_NAME)?.value);
   if (authenticated) return NextResponse.next();
 
@@ -18,5 +14,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ["/((?!_next/static|_next/image|favicon.ico|login|api/auth/login).*)"],
+  matcher: ["/((?!_next/static|_next/image|favicon.ico|login|register|api/auth/login|api/auth/register|api/auth/logout).*)"],
 };

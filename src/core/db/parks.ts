@@ -1,12 +1,12 @@
-import { desc, eq } from "drizzle-orm";
+import { and, desc, eq } from "drizzle-orm";
 
 import type { ParkDetailData, ParkCardData, RideDetailData } from "../domain/park-views";
 import { db } from "./index";
 import { parks, rideAliases, rideFieldSources, rideLogs, rides, visitDays } from "./schema";
 
-export function getParkCatalogData(): ParkCardData[] {
-  const parkRows = db.select().from(parks).orderBy(desc(parks.createdAt)).all();
-  const rideCounts = db.select({ parkId: rides.parkId }).from(rides).all();
+export function getParkCatalogData(userId: string, database: typeof db = db): ParkCardData[] {
+  const parkRows = database.select().from(parks).where(eq(parks.userId, userId)).orderBy(desc(parks.createdAt)).all();
+  const rideCounts = database.select({ parkId: rides.parkId }).from(rides).innerJoin(parks, eq(parks.id, rides.parkId)).where(eq(parks.userId, userId)).all();
   const countByPark = new Map<string, number>();
   for (const ride of rideCounts) countByPark.set(ride.parkId, (countByPark.get(ride.parkId) ?? 0) + 1);
 
@@ -21,8 +21,8 @@ export function getParkCatalogData(): ParkCardData[] {
   }));
 }
 
-export function getParkDetailData(parkId: string): ParkDetailData | null {
-  const park = db.select().from(parks).where(eq(parks.id, parkId)).get();
+export function getParkDetailData(parkId: string, userId: string): ParkDetailData | null {
+  const park = db.select().from(parks).where(and(eq(parks.id, parkId), eq(parks.userId, userId))).get();
   if (!park) return null;
 
   const rideRows = db.select().from(rides).where(eq(rides.parkId, parkId)).all();
@@ -79,8 +79,8 @@ export function getParkDetailData(parkId: string): ParkDetailData | null {
   };
 }
 
-export function getRideDetailData(parkId: string, rideId: string): RideDetailData | null {
-  const park = db.select().from(parks).where(eq(parks.id, parkId)).get();
+export function getRideDetailData(parkId: string, rideId: string, userId: string): RideDetailData | null {
+  const park = db.select().from(parks).where(and(eq(parks.id, parkId), eq(parks.userId, userId))).get();
   const ride = db.select().from(rides).where(eq(rides.id, rideId)).get();
   if (!park || !ride || ride.parkId !== park.id) return null;
   const logs = db.select({ lapCount: rideLogs.lapCount }).from(rideLogs).where(eq(rideLogs.rideId, ride.id)).all();

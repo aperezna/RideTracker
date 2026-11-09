@@ -1,50 +1,46 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
 import { createRideLogRecord, createRideRecord, updateRideManualFields, updateRideRatingRecord } from "@/core/db/repositories";
 import { rideSchema } from "@/core/validators/ride.schema";
 import { rideLogSchema } from "@/core/validators/ride-log.schema";
 import { rideRatingSchema } from "@/core/validators/ride-rating.schema";
 import { rideEnrichmentUpdateSchema } from "@/core/validators/ride-enrichment.schema";
-import { isValidSessionToken, SESSION_COOKIE_NAME } from "@/core/auth/session";
+import { requireCurrentUserId } from "@/core/auth/current-user";
 
-async function requireSession(): Promise<void> {
-  const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
-  if (!(await isValidSessionToken(token))) throw new Error("Unauthorized");
-}
+const requireSession = requireCurrentUserId;
 
 export async function recordRideCheckIn(input: unknown): Promise<string> {
-  await requireSession();
+  const userId = await requireSession();
   const log = rideLogSchema.parse(input);
   const id = log.id ?? crypto.randomUUID();
-  createRideLogRecord({ ...log, id });
+  createRideLogRecord({ ...log, id }, userId);
   revalidatePath("/");
   revalidatePath(`/visits/${log.visitDayId}`);
   return id;
 }
 
 export async function createRide(input: unknown): Promise<string> {
-  await requireSession();
+  const userId = await requireSession();
   const ride = rideSchema.parse(input);
   const id = ride.id ?? crypto.randomUUID();
-  createRideRecord({ ...ride, id });
+  createRideRecord({ ...ride, id }, userId);
   revalidatePath(`/parks/${ride.parkId}`);
   return id;
 }
 
 export async function updateRideRating(input: unknown): Promise<void> {
-  await requireSession();
+  const userId = await requireSession();
   const rating = rideRatingSchema.parse(input);
-  const parkId = updateRideRatingRecord(rating.rideId, rating.rating, rating.preferredRow, rating.reviewNotes);
+  const parkId = updateRideRatingRecord(rating.rideId, userId, rating.rating, rating.preferredRow, rating.reviewNotes);
   revalidatePath("/");
   if (parkId) revalidatePath(`/parks/${parkId}`);
 }
 
 export async function updateRideEnrichment(input: unknown): Promise<void> {
-  await requireSession();
+  const userId = await requireSession();
   const update = rideEnrichmentUpdateSchema.parse(input);
-  const parkId = updateRideManualFields(update.rideId, update);
+  const parkId = updateRideManualFields(update.rideId, userId, update);
   revalidatePath("/");
   if (parkId) {
     revalidatePath(`/parks/${parkId}`);

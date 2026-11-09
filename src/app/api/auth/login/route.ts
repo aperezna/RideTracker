@@ -1,20 +1,18 @@
-import { timingSafeEqual } from "node:crypto";
 import { NextResponse } from "next/server";
 
+import { verifyPassword } from "@/core/auth/password";
+import { getUserByEmail } from "@/core/db/repositories";
 import { createSessionToken, SESSION_COOKIE_NAME } from "@/core/auth/session";
 
 export async function POST(request: Request) {
-  const configuredPassword = process.env.APP_MASTER_PASSWORD;
-  if (!configuredPassword) return NextResponse.json({ error: "Authentication is not configured" }, { status: 503 });
-  const body = (await request.json()) as { password?: unknown };
+  const body = (await request.json()) as { email?: unknown; password?: unknown };
+  const email = typeof body.email === "string" ? body.email : "";
   const password = typeof body.password === "string" ? body.password : "";
-  const expected = Buffer.from(configuredPassword);
-  const received = Buffer.from(password);
-  const valid = expected.length === received.length && timingSafeEqual(expected, received);
-  if (!valid) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
+  const user = getUserByEmail(email);
+  if (!user || !(await verifyPassword(password, user.passwordHash))) return NextResponse.json({ error: "Invalid credentials" }, { status: 401 });
 
   const response = NextResponse.json({ authenticated: true });
-  response.cookies.set(SESSION_COOKIE_NAME, await createSessionToken(), {
+  response.cookies.set(SESSION_COOKIE_NAME, await createSessionToken(user.id), {
     httpOnly: true,
     sameSite: "lax",
     secure: process.env.NODE_ENV === "production",

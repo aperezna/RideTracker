@@ -4,6 +4,7 @@ import { RideRatingSheet } from "@/components/features/visits/RideRatingSheet";
 import { VisitDayHeader } from "@/components/features/visits/VisitDayHeader";
 import { AddRideToVisit } from "@/components/features/visits/AddRideToVisit";
 import { getVisitDayData } from "@/core/db/visits";
+import { requireCurrentUserId } from "@/core/auth/current-user";
 import { getRequestLocale } from "@/core/i18n/server";
 import { translate } from "@/core/i18n/translations";
 
@@ -12,7 +13,7 @@ export const dynamic = "force-dynamic";
 export default async function VisitDayPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ rideId?: string }> }) {
   const { id } = await params;
   const { rideId } = await searchParams;
-  const visit = getVisitDayData(id);
+  const visit = getVisitDayData(id, await requireCurrentUserId());
   if (!visit) notFound();
   const locale = await getRequestLocale();
   const selectedRideIds = rideId?.split(",").map((id) => decodeURIComponent(id)).filter((id) => visit.rides.some((ride) => ride.id === id)) ?? [];

@@ -1,5 +1,5 @@
 const SESSION_COOKIE_NAME = "ridetracker_session";
-const SESSION_VALUE = "authenticated";
+const SESSION_TTL_SECONDS = 60 * 60 * 24 * 30;
 
 function toBase64Url(bytes: Uint8Array): string {
   let binary = "";
@@ -25,22 +25,29 @@ function sessionSecret(): string {
   return secret;
 }
 
-export async function createSessionToken(): Promise<string> {
-  const signature = await sign(SESSION_VALUE, sessionSecret());
-  return `${toBase64Url(new TextEncoder().encode(SESSION_VALUE))}.${signature}`;
+export async function createSessionToken(userId: string): Promise<string> {
+  const value = `${userId}.${Math.floor(Date.now() / 1000) + SESSION_TTL_SECONDS}`;
+  const signature = await sign(value, sessionSecret());
+  return `${toBase64Url(new TextEncoder().encode(value))}.${signature}`;
+}
+
+export async function getSessionUserId(token: string | undefined): Promise<string | null> {
+  if (!token) return null;
+  const [encodedValue, signature] = token.split(".");
+  if (!encodedValue || !signature) return null;
+  try {
+    const value = new TextDecoder().decode(fromBase64Url(encodedValue));
+    const [userId, expiresAt] = value.split(".");
+    if (!userId || !expiresAt || Number(expiresAt) < Math.floor(Date.now() / 1000)) return null;
+    if ((await sign(value, sessionSecret())) !== signature) return null;
+    return userId;
+  } catch {
+    return null;
+  }
 }
 
 export async function isValidSessionToken(token: string | undefined): Promise<boolean> {
-  if (!token) return false;
-  const [encodedValue, signature] = token.split(".");
-  if (!encodedValue || !signature) return false;
-  try {
-    const value = new TextDecoder().decode(fromBase64Url(encodedValue));
-    if (value !== SESSION_VALUE) return false;
-    return (await sign(value, sessionSecret())) === signature;
-  } catch {
-    return false;
-  }
+  return (await getSessionUserId(token)) !== null;
 }
 
 export { SESSION_COOKIE_NAME };

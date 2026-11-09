@@ -2,6 +2,7 @@
 
 import { FormEvent, useState } from "react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
 import { useLocale } from "@/components/i18n/LocaleProvider";
 import { translateError } from "@/core/i18n/translations";
 
@@ -9,6 +10,7 @@ export default function LoginPage() {
   const router = useRouter();
   const { locale, t, setLocale } = useLocale();
   const [password, setPassword] = useState("");
+  const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [submitting, setSubmitting] = useState(false);
 
@@ -21,7 +23,7 @@ export default function LoginPage() {
       const response = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
+         body: JSON.stringify({ email, password }),
       });
 
       if (!response.ok) {
@@ -47,8 +49,12 @@ export default function LoginPage() {
         <p className="mt-2 text-sm text-slate-400">{t("login.description")}</p>
 
         <form className="mt-8 space-y-5" onSubmit={handleSubmit}>
-          <label className="block text-sm font-medium text-slate-200" htmlFor="password">
-             {t("login.masterPassword")}
+           <label className="block text-sm font-medium text-slate-200" htmlFor="email">
+             {t("login.email")}
+             <input autoComplete="email" className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-slate-100 outline-none transition focus:border-emerald-400" id="email" onChange={(event) => setEmail(event.target.value)} required type="email" value={email} />
+           </label>
+           <label className="block text-sm font-medium text-slate-200" htmlFor="password">
+             {t("login.password")}
             <input
               autoComplete="current-password"
               className="mt-2 w-full rounded-lg border border-slate-700 bg-slate-950 px-3 py-2.5 text-slate-100 outline-none transition focus:border-emerald-400"
@@ -70,6 +76,7 @@ export default function LoginPage() {
              {submitting ? t("login.submitting") : t("login.submit")}
           </button>
         </form>
+        <p className="mt-6 text-center text-sm text-slate-400">{t("login.registerPrompt")} <Link className="text-emerald-300 hover:text-emerald-200" href="/register">{t("login.registerLink")}</Link></p>
       </section>
     </main>
   );

@@ -1,29 +1,25 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { cookies } from "next/headers";
 import { createVisitDayRecord, updateVisitDayRecord } from "@/core/db/repositories";
 import { updateVisitDaySchema, visitDaySchema } from "@/core/validators/visit-day.schema";
-import { isValidSessionToken, SESSION_COOKIE_NAME } from "@/core/auth/session";
+import { requireCurrentUserId } from "@/core/auth/current-user";
 
-async function requireSession(): Promise<void> {
-  const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
-  if (!(await isValidSessionToken(token))) throw new Error("Unauthorized");
-}
+const requireSession = requireCurrentUserId;
 
 export async function recordVisitDay(input: unknown): Promise<string> {
-  await requireSession();
+  const userId = await requireSession();
   const visit = visitDaySchema.parse(input);
   const id = crypto.randomUUID();
-  createVisitDayRecord({ ...visit, id, createdAt: new Date() });
+  createVisitDayRecord({ ...visit, id, createdAt: new Date() }, userId);
   revalidatePath(`/parks/${visit.parkId}`);
   return id;
 }
 
 export async function updateVisitDay(visitDayId: string, input: unknown): Promise<void> {
-  await requireSession();
+  const userId = await requireSession();
   const visit = updateVisitDaySchema.parse(input);
-  updateVisitDayRecord(visitDayId, {
+  updateVisitDayRecord(visitDayId, userId, {
     visitDate: visit.visitDate,
     tripNotes: visit.tripNotes ?? null,
     durationMinutes: visit.durationMinutes ?? null,

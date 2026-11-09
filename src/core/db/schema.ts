@@ -7,6 +7,7 @@ export const categoryEnrichmentStatuses = ["PENDING", "PROCESSING", "RETRY", "DO
 
 export const parks = sqliteTable("parks", {
   id: text("id").primaryKey(),
+  userId: text("user_id").references(() => users.id),
   externalId: text("external_id"),
   name: text("name").notNull(),
   country: text("country").notNull(),
@@ -15,6 +16,13 @@ export const parks = sqliteTable("parks", {
   longitude: real("longitude").notNull(),
   status: text("status", { enum: parkStatuses }).notNull(),
   tripNotes: text("trip_notes").notNull().default(""),
+  createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
+});
+
+export const users = sqliteTable("users", {
+  id: text("id").primaryKey(),
+  email: text("email").notNull().unique(),
+  passwordHash: text("password_hash").notNull(),
   createdAt: integer("created_at", { mode: "timestamp_ms" }).notNull(),
 });
 

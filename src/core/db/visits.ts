@@ -1,13 +1,13 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 
 import type { VisitDayData } from "../domain/park-views";
 import { db } from "./index";
 import { parks, rideLogs, rides, visitDays } from "./schema";
 
-export function getVisitDayData(visitDayId: string): VisitDayData | null {
+export function getVisitDayData(visitDayId: string, userId: string): VisitDayData | null {
   const visit = db.select().from(visitDays).where(eq(visitDays.id, visitDayId)).get();
   if (!visit) return null;
-  const park = db.select().from(parks).where(eq(parks.id, visit.parkId)).get();
+  const park = db.select().from(parks).where(and(eq(parks.id, visit.parkId), eq(parks.userId, userId))).get();
   if (!park) return null;
   const rideRows = db.select().from(rides).where(eq(rides.parkId, park.id)).all();
   const logs = db.select().from(rideLogs).where(eq(rideLogs.visitDayId, visitDayId)).all();

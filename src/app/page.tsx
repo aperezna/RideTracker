@@ -8,15 +8,17 @@ import { getRequestLocale } from "@/core/i18n/server";
 import { translate } from "@/core/i18n/translations";
 import { getAnalyticsData } from "@/core/db/analytics";
 import { AnalyticsPanel } from "@/components/features/dashboard/AnalyticsPanel";
+import { requireCurrentUserId } from "@/core/auth/current-user";
 
 export const dynamic = "force-dynamic";
 
 const emptyDashboard: DashboardView = { uniqueCoasterCount: 0, visitedParks: 0, plannedParks: 0, wishlistParks: 0, totalLaps: 0, topCountry: "—", topRides: [], parks: [], countries: [] };
 
-export default function Home() {
+export default async function Home() {
+  const userId = await requireCurrentUserId();
   let dashboard = emptyDashboard;
-  try { dashboard = getDashboardData(); } catch { /* Empty database before first migration. */ }
-  const analytics = getAnalyticsData();
+  try { dashboard = getDashboardData(userId); } catch { /* Empty database before first migration. */ }
+  const analytics = getAnalyticsData(userId);
 
   return <HomeContent dashboard={dashboard} analytics={analytics} />;
 }

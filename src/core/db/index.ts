@@ -7,6 +7,12 @@ import * as schema from "./schema";
 
 function ensureSchema(client: Database.Database): void {
   client.exec(`
+    CREATE TABLE IF NOT EXISTS users (
+      id TEXT PRIMARY KEY,
+      email TEXT NOT NULL UNIQUE,
+      password_hash TEXT NOT NULL,
+      created_at INTEGER NOT NULL
+    );
     CREATE TABLE IF NOT EXISTS parks (
       id TEXT PRIMARY KEY,
       external_id TEXT,
@@ -86,7 +92,7 @@ function ensureSchema(client: Database.Database): void {
       updated_at INTEGER NOT NULL
     );
   `);
-  const addColumnIfMissing = (table: "rides" | "visit_days", name: string, definition: string) => {
+  const addColumnIfMissing = (table: "parks" | "rides" | "visit_days", name: string, definition: string) => {
     const columns = client.prepare(`PRAGMA table_info(${table})`).all() as Array<{ name: string }>;
     if (columns.some((column) => column.name === name)) return;
     try {
@@ -104,6 +110,7 @@ function ensureSchema(client: Database.Database): void {
   addColumnIfMissing("rides", "experience_manual", "INTEGER NOT NULL DEFAULT 0");
   addColumnIfMissing("rides", "storytelling_manual", "INTEGER NOT NULL DEFAULT 0");
   addColumnIfMissing("rides", "photo_manual", "INTEGER NOT NULL DEFAULT 0");
+  addColumnIfMissing("parks", "user_id", "TEXT REFERENCES users(id)");
   addColumnIfMissing("visit_days", "duration_minutes", "INTEGER");
   addColumnIfMissing("visit_days", "weather", "TEXT");
   addColumnIfMissing("visit_days", "company", "TEXT");

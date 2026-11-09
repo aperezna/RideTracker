@@ -14,14 +14,17 @@ import {
   type TopRideRow,
 } from "../domain/dashboard-stats";
 import { db } from "./index";
+import { eq } from "drizzle-orm";
 import { parks, rideLogs, rides } from "./schema";
 
-export function getDashboardData(): DashboardView {
-  const parkRows = db.select().from(parks).all();
-  const rideRows = db.select().from(rides).all();
+export function getDashboardData(userId: string): DashboardView {
+  const parkRows = db.select().from(parks).where(eq(parks.userId, userId)).all();
+  const rideRows = db.select().from(rides).innerJoin(parks, eq(parks.id, rides.parkId)).where(eq(parks.userId, userId)).all().map(({ rides: ride }) => ride);
   const logRows = db
     .select({ rideId: rideLogs.rideId, status: rideLogs.status, lapCount: rideLogs.lapCount })
     .from(rideLogs)
+    .innerJoin(parks, eq(parks.id, rides.parkId))
+    .where(eq(parks.userId, userId))
     .all();
 
   const domainParks: DomainPark[] = parkRows.map((park) => ({

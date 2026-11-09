@@ -1,17 +1,15 @@
 import { NextResponse } from "next/server";
-import { cookies } from "next/headers";
 import { revalidatePath } from "next/cache";
 import { createRideLogRecord } from "@/core/db/repositories";
 import { rideLogSchema } from "@/core/validators/ride-log.schema";
-import { isValidSessionToken, SESSION_COOKIE_NAME } from "@/core/auth/session";
+import { requireCurrentUserId } from "@/core/auth/current-user";
 
 export async function POST(request: Request): Promise<NextResponse> {
-  const token = (await cookies()).get(SESSION_COOKIE_NAME)?.value;
-  if (!(await isValidSessionToken(token))) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  const userId = await requireCurrentUserId();
   try {
     const log = rideLogSchema.parse(await request.json());
     const id = log.id ?? crypto.randomUUID();
-    createRideLogRecord({ ...log, id });
+    createRideLogRecord({ ...log, id }, userId);
     revalidatePath("/");
     revalidatePath(`/visits/${log.visitDayId}`);
     return NextResponse.json({ id });

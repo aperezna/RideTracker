@@ -1,7 +1,7 @@
 import { and, asc, eq, gt, inArray, isNull, lte, or, sql } from "drizzle-orm";
 
 import { db } from "./index";
-import { categoryEnrichmentJobs, enrichmentSourceFailures, parks, parkOfficialLinks, rideAliases, rideFieldSources, rideLogs, rides, visitDays, waitTimeObservations } from "./schema";
+import { categoryEnrichmentJobs, enrichmentSourceFailures, parks, parkOfficialLinks, rideAliases, rideFieldSources, rideLogs, rides, users, visitDays, waitTimeObservations } from "./schema";
 import { transitionParkStatusOnFirstVisit } from "../domain/coaster-stats";
 import type { BackupInput } from "../validators/backup.schema";
 
@@ -11,9 +11,32 @@ type VisitDayRecord = typeof visitDays.$inferInsert;
 type RideLogRecord = typeof rideLogs.$inferInsert;
 type WaitTimeObservationRecord = typeof waitTimeObservations.$inferInsert;
 
-export function importParkRecord(park: ParkRecord, importedRides: RideRecord[]): void {
+export function normalizeEmail(email: string): string {
+  return email.trim().toLowerCase();
+}
+
+export function getUserByEmail(email: string) {
+  return db.select().from(users).where(eq(users.email, normalizeEmail(email))).get();
+}
+
+export function createUserRecord(email: string, passwordHash: string): string {
+  const id = crypto.randomUUID();
+  const normalizedEmail = normalizeEmail(email);
   db.transaction((transaction) => {
-    transaction.insert(parks).values(park).onConflictDoNothing().run();
+    const existingUsers = transaction.select({ id: users.id }).from(users).all();
+    transaction.insert(users).values({ id, email: normalizedEmail, passwordHash, createdAt: new Date() }).run();
+    if (existingUsers.length === 0) transaction.update(parks).set({ userId: id }).where(isNull(parks.userId)).run();
+  });
+  return id;
+}
+
+export function getUserById(userId: string) {
+  return db.select({ id: users.id, email: users.email }).from(users).where(eq(users.id, userId)).get();
+}
+
+export function importParkRecord(park: ParkRecord, importedRides: RideRecord[], userId: string): void {
+  db.transaction((transaction) => {
+    transaction.insert(parks).values({ ...park, userId }).onConflictDoNothing().run();
       for (const ride of importedRides) {
         const updates = {
           name: sql`excluded.name`,
@@ -28,20 +51,21 @@ export function importParkRecord(park: ParkRecord, importedRides: RideRecord[]):
   });
 }
 
-export function createParkRecord(park: ParkRecord): void {
-  db.insert(parks).values(park).run();
+export function createParkRecord(park: ParkRecord, userId: string): void {
+  db.insert(parks).values({ ...park, userId }).run();
 }
 
-export function updateParkNotesRecord(parkId: string, tripNotes: string): void {
-  db.update(parks).set({ tripNotes }).where(eq(parks.id, parkId)).run();
+export function updateParkNotesRecord(parkId: string, userId: string, tripNotes: string): void {
+  db.update(parks).set({ tripNotes }).where(and(eq(parks.id, parkId), eq(parks.userId, userId))).run();
 }
 
-export function updateParkStatusRecord(parkId: string, status: typeof parks.$inferInsert.status): void {
-  db.update(parks).set({ status }).where(eq(parks.id, parkId)).run();
+export function updateParkStatusRecord(parkId: string, userId: string, status: typeof parks.$inferInsert.status): void {
+  db.update(parks).set({ status }).where(and(eq(parks.id, parkId), eq(parks.userId, userId))).run();
 }
 
-export function deleteParkRecord(parkId: string, database: typeof db = db): void {
+export function deleteParkRecord(parkId: string, userId: string, database: typeof db = db): void {
   database.transaction((transaction) => {
+    if (!transaction.select({ id: parks.id }).from(parks).where(and(eq(parks.id, parkId), eq(parks.userId, userId))).get()) return;
     const rideIds = transaction.select({ id: rides.id }).from(rides).where(eq(rides.parkId, parkId)).all().map((ride) => ride.id);
     const visitDayIds = transaction.select({ id: visitDays.id }).from(visitDays).where(eq(visitDays.parkId, parkId)).all().map((visitDay) => visitDay.id);
     if (rideIds.length > 0) transaction.delete(rideLogs).where(inArray(rideLogs.rideId, rideIds)).run();
@@ -60,9 +84,10 @@ export function deleteParkRecord(parkId: string, database: typeof db = db): void
   });
 }
 
-export function enqueueRideCategoryJobs(parkId: string, rideIds: string[]): void {
+export function enqueueRideCategoryJobs(parkId: string, rideIds: string[], userId: string): void {
   const now = new Date();
   db.transaction((transaction) => {
+    if (!transaction.select({ id: parks.id }).from(parks).where(and(eq(parks.id, parkId), eq(parks.userId, userId))).get()) return;
     for (const rideId of rideIds) {
       const ride = transaction.select({ category: rides.category, photoUrl: rides.photoUrl, experience: rides.experience, storytelling: rides.storytelling }).from(rides).where(eq(rides.id, rideId)).get();
       if (!ride) continue;
@@ -203,7 +228,7 @@ export function updateRideEnrichmentRecord(rideId: string, category: typeof ride
 
 export type ManualRideFields = Partial<Pick<typeof rides.$inferInsert, "category" | "manufacturer" | "experience" | "storytelling">>;
 
-export function updateRideManualFields(rideId: string, fields: ManualRideFields): string | undefined {
+export function updateRideManualFields(rideId: string, userId: string, fields: ManualRideFields): string | undefined {
   const updates = {
     ...(fields.category !== undefined ? { category: fields.category, categoryManual: true } : {}),
     ...(fields.manufacturer !== undefined ? { manufacturer: fields.manufacturer, manufacturerManual: true } : {}),
@@ -211,8 +236,10 @@ export function updateRideManualFields(rideId: string, fields: ManualRideFields)
     ...(fields.storytelling !== undefined ? { storytelling: fields.storytelling, storytellingManual: true } : {}),
   };
   if (Object.keys(updates).length === 0) return undefined;
+  const ride = db.select({ parkId: rides.parkId }).from(rides).innerJoin(parks, eq(parks.id, rides.parkId)).where(and(eq(rides.id, rideId), eq(parks.userId, userId))).get();
+  if (!ride) return undefined;
   db.update(rides).set(updates).where(eq(rides.id, rideId)).run();
-  return db.select({ parkId: rides.parkId }).from(rides).where(eq(rides.id, rideId)).get()?.parkId;
+  return ride.parkId;
 }
 
 export function recordRideFieldSources(rideId: string, sources: Array<{ field: string; source: string; sourceUrl?: string | null }>): void {
@@ -267,41 +294,43 @@ export function retryRideCategoryJob(job: CategoryEnrichmentJob, error: string, 
   db.update(categoryEnrichmentJobs).set({ status, attempts, nextAttemptAt, lastError: error.slice(0, 500), updatedAt: new Date() }).where(eq(categoryEnrichmentJobs.id, job.id)).run();
 }
 
-export function updateVisitDayNotesRecord(visitDayId: string, tripNotes: string): void {
-  db.update(visitDays).set({ tripNotes }).where(eq(visitDays.id, visitDayId)).run();
+export function updateVisitDayNotesRecord(visitDayId: string, userId: string, tripNotes: string): void {
+  db.update(visitDays).set({ tripNotes }).where(and(eq(visitDays.id, visitDayId), sql`EXISTS (SELECT 1 FROM parks WHERE parks.id = ${visitDays.parkId} AND parks.user_id = ${userId})`)).run();
 }
 
-export function updateVisitDayRecord(visitDayId: string, values: Pick<typeof visitDays.$inferInsert, "visitDate" | "tripNotes" | "durationMinutes" | "weather" | "company" | "overallRating">): void {
-  db.update(visitDays).set(values).where(eq(visitDays.id, visitDayId)).run();
+export function updateVisitDayRecord(visitDayId: string, userId: string, values: Pick<typeof visitDays.$inferInsert, "visitDate" | "tripNotes" | "durationMinutes" | "weather" | "company" | "overallRating">): void {
+  db.update(visitDays).set(values).where(and(eq(visitDays.id, visitDayId), sql`EXISTS (SELECT 1 FROM parks WHERE parks.id = ${visitDays.parkId} AND parks.user_id = ${userId})`)).run();
 }
 
-export function createRideRecord(ride: RideRecord): void {
-  if (!db.select({ id: parks.id }).from(parks).where(eq(parks.id, ride.parkId)).get()) throw new Error("Park not found");
+export function createRideRecord(ride: RideRecord, userId: string): void {
+  if (!db.select({ id: parks.id }).from(parks).where(and(eq(parks.id, ride.parkId), eq(parks.userId, userId))).get()) throw new Error("Park not found");
   db.insert(rides).values(ride).run();
 }
 
-export function createVisitDayRecord(visit: VisitDayRecord): void {
+export function createVisitDayRecord(visit: VisitDayRecord, userId: string): void {
   db.transaction((transaction) => {
-    const park = transaction.select({ status: parks.status }).from(parks).where(eq(parks.id, visit.parkId)).get();
+    const park = transaction.select({ status: parks.status }).from(parks).where(and(eq(parks.id, visit.parkId), eq(parks.userId, userId))).get();
     if (!park) throw new Error("Park not found");
     transaction.insert(visitDays).values(visit).run();
     transaction.update(parks).set({ status: transitionParkStatusOnFirstVisit(park.status) }).where(eq(parks.id, visit.parkId)).run();
   });
 }
 
-export function createRideLogRecord(log: RideLogRecord): void {
+export function createRideLogRecord(log: RideLogRecord, userId: string): void {
   const context = db.select({ parkId: visitDays.parkId, rideParkId: rides.parkId })
-    .from(visitDays).innerJoin(rides, eq(rides.id, log.rideId)).where(eq(visitDays.id, log.visitDayId)).get();
+    .from(visitDays).innerJoin(rides, eq(rides.id, log.rideId)).innerJoin(parks, eq(parks.id, rides.parkId)).where(and(eq(visitDays.id, log.visitDayId), eq(parks.userId, userId))).get();
   if (!context || context.parkId !== context.rideParkId) throw new Error("Ride does not belong to the visit day park");
   db.insert(rideLogs).values(log).onConflictDoNothing().run();
 }
 
 export type WaitTimeSnapshot = Pick<WaitTimeObservationRecord, "rideId" | "source" | "waitMinutes" | "isOpen">;
 
-export function recordWaitTimeSnapshots(snapshots: WaitTimeSnapshot[], observedAt = new Date()): void {
+export function recordWaitTimeSnapshots(snapshots: WaitTimeSnapshot[], userId: string, observedAt = new Date()): void {
   const recentThreshold = new Date(observedAt.getTime() - 5 * 60_000);
   db.transaction((transaction) => {
     for (const snapshot of snapshots) {
+      const ownedRide = transaction.select({ id: rides.id }).from(rides).innerJoin(parks, eq(parks.id, rides.parkId)).where(and(eq(rides.id, snapshot.rideId), eq(parks.userId, userId))).get();
+      if (!ownedRide) continue;
       const recent = transaction.select({ id: waitTimeObservations.id })
         .from(waitTimeObservations)
         .where(and(
@@ -317,34 +346,53 @@ export function recordWaitTimeSnapshots(snapshots: WaitTimeSnapshot[], observedA
   });
 }
 
-export function updateRideRatingRecord(rideId: string, rating: number, preferredRow: string | null | undefined, reviewNotes: string | null | undefined): string | undefined {
+export function updateRideRatingRecord(rideId: string, userId: string, rating: number, preferredRow: string | null | undefined, reviewNotes: string | null | undefined): string | undefined {
+  const ride = db.select({ parkId: rides.parkId }).from(rides).innerJoin(parks, eq(parks.id, rides.parkId)).where(and(eq(rides.id, rideId), eq(parks.userId, userId))).get();
+  if (!ride) return undefined;
   db.update(rides).set({ rating, preferredRow, reviewNotes }).where(eq(rides.id, rideId)).run();
-  return db.select({ parkId: rides.parkId }).from(rides).where(eq(rides.id, rideId)).get()?.parkId;
+  return ride.parkId;
 }
 
-export function updateRideManufacturerRecord(rideId: string, manufacturer: string): void {
-  db.update(rides).set({ manufacturer }).where(eq(rides.id, rideId)).run();
+export function updateRideManufacturerRecord(rideId: string, userId: string, manufacturer: string): void {
+  const ride = db.select({ id: rides.id }).from(rides).innerJoin(parks, eq(parks.id, rides.parkId)).where(and(eq(rides.id, rideId), eq(parks.userId, userId))).get();
+  if (ride) db.update(rides).set({ manufacturer }).where(eq(rides.id, rideId)).run();
 }
 
-export function exportBackup(): BackupInput {
+export function exportBackup(userId: string): BackupInput {
+  const ownedParkIds = db.select({ id: parks.id }).from(parks).where(eq(parks.userId, userId)).all().map(({ id }) => id);
+  const ownedRideIds = ownedParkIds.length === 0 ? [] : db.select({ id: rides.id }).from(rides).where(inArray(rides.parkId, ownedParkIds)).all().map(({ id }) => id);
   return {
-    parks: db.select().from(parks).all(),
-    rides: db.select().from(rides).all(),
-    visitDays: db.select().from(visitDays).all(),
-    rideLogs: db.select().from(rideLogs).all(),
-    waitTimeObservations: db.select().from(waitTimeObservations).all(),
+    parks: db.select().from(parks).where(eq(parks.userId, userId)).all(),
+    rides: db.select().from(rides).innerJoin(parks, eq(parks.id, rides.parkId)).where(eq(parks.userId, userId)).all().map(({ rides: ride }) => ride),
+    visitDays: db.select().from(visitDays).innerJoin(parks, eq(parks.id, visitDays.parkId)).where(eq(parks.userId, userId)).all().map(({ visit_days: visit }) => visit),
+    rideLogs: ownedRideIds.length === 0 ? [] : db.select().from(rideLogs).where(inArray(rideLogs.rideId, ownedRideIds)).all(),
+    waitTimeObservations: ownedRideIds.length === 0 ? [] : db.select().from(waitTimeObservations).where(inArray(waitTimeObservations.rideId, ownedRideIds)).all(),
   };
 }
 
-export function importBackup(backup: BackupInput, toDate: (value: string | number | Date) => Date): void {
+export function importBackup(backup: BackupInput, userId: string, toDate: (value: string | number | Date) => Date): void {
   db.transaction((transaction) => {
-    transaction.delete(rideLogs).run();
-    transaction.delete(waitTimeObservations).run();
-    transaction.delete(visitDays).run();
-    transaction.delete(categoryEnrichmentJobs).run();
-    transaction.delete(rides).run();
-    transaction.delete(parks).run();
-    transaction.insert(parks).values(backup.parks.map((park) => ({ ...park, createdAt: toDate(park.createdAt) }))).run();
+    const ownedParkIds = transaction.select({ id: parks.id }).from(parks).where(eq(parks.userId, userId)).all().map(({ id }) => id);
+    const ownedRideIds = ownedParkIds.length === 0 ? [] : transaction.select({ id: rides.id }).from(rides).where(inArray(rides.parkId, ownedParkIds)).all().map(({ id }) => id);
+    const ownedVisitIds = ownedParkIds.length === 0 ? [] : transaction.select({ id: visitDays.id }).from(visitDays).where(inArray(visitDays.parkId, ownedParkIds)).all().map(({ id }) => id);
+    if (ownedRideIds.length > 0) {
+      transaction.delete(rideLogs).where(inArray(rideLogs.rideId, ownedRideIds)).run();
+      transaction.delete(waitTimeObservations).where(inArray(waitTimeObservations.rideId, ownedRideIds)).run();
+    }
+    if (ownedVisitIds.length > 0) transaction.delete(rideLogs).where(inArray(rideLogs.visitDayId, ownedVisitIds)).run();
+    if (ownedParkIds.length > 0) {
+      transaction.delete(visitDays).where(inArray(visitDays.id, ownedVisitIds)).run();
+      transaction.delete(categoryEnrichmentJobs).where(inArray(categoryEnrichmentJobs.parkId, ownedParkIds)).run();
+      transaction.delete(parkOfficialLinks).where(inArray(parkOfficialLinks.parkId, ownedParkIds)).run();
+      if (ownedRideIds.length > 0) {
+        transaction.delete(rideFieldSources).where(inArray(rideFieldSources.rideId, ownedRideIds)).run();
+        transaction.delete(rideAliases).where(inArray(rideAliases.rideId, ownedRideIds)).run();
+        transaction.delete(enrichmentSourceFailures).where(inArray(enrichmentSourceFailures.scopeKey, ownedRideIds)).run();
+      }
+      transaction.delete(rides).where(inArray(rides.parkId, ownedParkIds)).run();
+      transaction.delete(parks).where(inArray(parks.id, ownedParkIds)).run();
+    }
+    transaction.insert(parks).values(backup.parks.map((park) => ({ ...park, userId, createdAt: toDate(park.createdAt) }))).run();
     transaction.insert(rides).values(backup.rides).run();
     transaction.insert(visitDays).values(backup.visitDays.map((day) => ({ ...day, durationMinutes: day.durationMinutes ?? null, weather: day.weather ?? null, company: day.company ?? null, overallRating: day.overallRating ?? null, createdAt: toDate(day.createdAt) }))).run();
     transaction.insert(rideLogs).values(backup.rideLogs).run();

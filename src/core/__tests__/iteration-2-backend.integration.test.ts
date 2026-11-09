@@ -1,14 +1,16 @@
 import { describe, expect, it } from "vitest";
 import { createDatabase } from "@/core/db";
 import { deleteParkRecord } from "@/core/db/repositories";
-import { parks, rideAliases, rideFieldSources, rideLogs, rides, visitDays, waitTimeObservations } from "@/core/db/schema";
+import { parks, rideAliases, rideFieldSources, rideLogs, rides, users, visitDays, waitTimeObservations } from "@/core/db/schema";
 import { calculateTopTen, calculateUniqueCoasterCount } from "@/core/domain/coaster-stats";
 import { transitionParkStatusOnFirstVisit } from "@/core/domain/coaster-stats";
+import { getParkCatalogData } from "@/core/db/parks";
 
 function createSchema(connection: ReturnType<typeof createDatabase>): void {
   connection.client.exec(`
+    CREATE TABLE users (id TEXT PRIMARY KEY, email TEXT NOT NULL UNIQUE, password_hash TEXT NOT NULL, created_at INTEGER NOT NULL);
     CREATE TABLE parks (
-      id TEXT PRIMARY KEY, external_id TEXT, name TEXT NOT NULL, country TEXT NOT NULL,
+      id TEXT PRIMARY KEY, user_id TEXT REFERENCES users(id), external_id TEXT, name TEXT NOT NULL, country TEXT NOT NULL,
       city TEXT NOT NULL, latitude REAL NOT NULL, longitude REAL NOT NULL,
       status TEXT NOT NULL, trip_notes TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL
     );
@@ -44,7 +46,8 @@ describe("Iteration 2 SQLite persistence", () => {
     createSchema(connection);
     const createdAt = new Date("2026-12-30T00:00:00.000Z");
 
-    connection.db.insert(parks).values({ id: "park-1", name: "Park", country: "DE", city: "Brühl", latitude: 50, longitude: 7, status: "VISITED", tripNotes: "Plan", createdAt }).run();
+    connection.db.insert(users).values({ id: "user-1", email: "one@example.com", passwordHash: "hash", createdAt }).run();
+    connection.db.insert(parks).values({ id: "park-1", userId: "user-1", name: "Park", country: "DE", city: "Brühl", latitude: 50, longitude: 7, status: "VISITED", tripNotes: "Plan", createdAt }).run();
     connection.db.insert(rides).values({ id: "ride-1", parkId: "park-1", name: "Coaster", category: "COASTER", manufacturer: "Maker", rating: 9, preferredRow: "FRONT" }).run();
     connection.db.insert(visitDays).values({ id: "day-1", parkId: "park-1", visitDate: "2026-12-30", tripNotes: "Cold", createdAt }).run();
     connection.db.insert(rideLogs).values({ id: "log-1", visitDayId: "day-1", rideId: "ride-1", status: "RIDDEN", lapCount: 2, rowUsed: "FRONT" }).run();
@@ -74,20 +77,37 @@ describe("Iteration 2 SQLite persistence", () => {
     const connection = createDatabase(":memory:");
     createSchema(connection);
     const createdAt = new Date("2026-12-30T00:00:00.000Z");
-    connection.db.insert(parks).values({ id: "park-1", name: "Park", country: "DE", city: "Brühl", latitude: 50, longitude: 7, status: "VISITED", createdAt }).run();
+    connection.db.insert(users).values({ id: "user-1", email: "one@example.com", passwordHash: "hash", createdAt }).run();
+    connection.db.insert(parks).values({ id: "park-1", userId: "user-1", name: "Park", country: "DE", city: "Brühl", latitude: 50, longitude: 7, status: "VISITED", createdAt }).run();
     connection.db.insert(rides).values({ id: "ride-1", parkId: "park-1", name: "Coaster", category: "COASTER" }).run();
     connection.db.insert(visitDays).values({ id: "day-1", parkId: "park-1", visitDate: "2026-12-30", createdAt }).run();
     connection.db.insert(rideLogs).values({ id: "log-1", visitDayId: "day-1", rideId: "ride-1", status: "RIDDEN" }).run();
     connection.db.insert(waitTimeObservations).values({ id: "wait-1", rideId: "ride-1", source: "test", observedAt: createdAt }).run();
     connection.db.insert(rideFieldSources).values({ id: "source-1", rideId: "ride-1", field: "category", source: "test", observedAt: createdAt }).run();
     connection.db.insert(rideAliases).values({ id: "alias-1", rideId: "ride-1", alias: "Coaster alias" }).run();
-    deleteParkRecord("park-1", connection.db);
+    deleteParkRecord("park-1", "user-1", connection.db);
     expect(connection.db.select().from(parks).all()).toHaveLength(0);
     expect(connection.db.select().from(rides).all()).toHaveLength(0);
     expect(connection.db.select().from(rideLogs).all()).toHaveLength(0);
     expect(connection.db.select().from(waitTimeObservations).all()).toHaveLength(0);
     expect(connection.db.select().from(rideFieldSources).all()).toHaveLength(0);
     expect(connection.db.select().from(rideAliases).all()).toHaveLength(0);
+    connection.client.close();
+  });
+
+  it("returns only the requesting user's parks", () => {
+    const connection = createDatabase(":memory:");
+    createSchema(connection);
+    const createdAt = new Date("2026-12-30T00:00:00.000Z");
+    connection.db.insert(users).values([
+      { id: "user-1", email: "one@example.com", passwordHash: "hash", createdAt },
+      { id: "user-2", email: "two@example.com", passwordHash: "hash", createdAt },
+    ]).run();
+    connection.db.insert(parks).values([
+      { id: "park-1", userId: "user-1", name: "Private One", country: "DE", city: "Brühl", latitude: 50, longitude: 7, status: "VISITED", createdAt },
+      { id: "park-2", userId: "user-2", name: "Private Two", country: "US", city: "Orlando", latitude: 28, longitude: -81, status: "PLANNED", createdAt },
+    ]).run();
+    expect(getParkCatalogData("user-1", connection.db).map((park) => park.name)).toEqual(["Private One"]);
     connection.client.close();
   });
 
