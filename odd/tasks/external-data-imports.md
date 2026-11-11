@@ -26,10 +26,10 @@ Checks: focused tests, full test suite, typecheck, lint, build, and documentatio
 
 ## Tasks
 
-- T1 (S1-S3): Define source-agnostic import contracts, normalized identity matching, and a validated preview/apply service. Route: inline. Status: complete; focused importer tests, typecheck, and lint green. Commit: pending.
-- T2 (S1-S3): Add the authenticated import UI/API and persistence transaction with duplicate reporting. Route: inline. Status: complete; `/import`, `/api/import`, preview/apply flow, ownership, and duplicate handling implemented. Commit: pending.
+- T1 (S1-S3): Define source-agnostic import contracts, normalized identity matching, and a validated preview/apply service. Route: inline. Status: complete; focused importer tests, typecheck, and lint green. Commit: 5e8143e.
+- T2 (S1-S3): Add the authenticated import UI/API and persistence transaction with duplicate reporting. Route: inline. Status: complete; `/import`, `/api/import`, preview/apply flow, ownership, and duplicate handling implemented. Commit: 5e8143e.
 - T3 (S2-S3): Add source metadata and public-enrichment connector boundaries without importing closed-account data. Route: inline. Status: deferred; existing Queue-Times and ThemeParks.wiki adapters remain enrichment-only. Commit: pending.
-- T4 (S1-S3): Add user documentation and complete verification. Route: inline. Status: in progress; README updated, final suite/build pending. Commit: pending.
+- T4 (S1-S3): Add user documentation and complete verification. Route: inline. Status: complete; README updated; 47 tests, typecheck, lint, build, and diff check green. Commit: 5e8143e.
 
 ## Log
 
@@ -42,3 +42,4 @@ L6: “eso es”
 L7: Market exploration found no supported LogRide user-data export. Coaster-Count has no documented public export in the reviewed app page; CreditTracker exposes a small open API; Queue-Times and ThemeParks.wiki are public enrichment sources rather than personal-history imports.
 L8: “procede”
 L9: Implemented the first usable Import Center slice with canonical CSV/JSON rows, preview/apply, validation, ownership isolation, deterministic IDs, and duplicate detection. External adapters remain deferred until official public contracts are selected.
+L10: Verification completed: `npm run test` (47 passing), `npm run typecheck`, `npm run lint`, `npm run build`, and `git diff --check` passed.
