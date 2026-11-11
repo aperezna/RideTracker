@@ -1,12 +1,13 @@
 import { z } from "zod";
 
 import type { QueueTimesRideStatus } from "./queue-times.service";
+import { getPublicEnrichmentSource } from "./public-enrichment";
 
 const BASE_URL = "https://api.themeparks.wiki/v1";
 const destinationsSchema = z.object({ destinations: z.array(z.object({ parks: z.array(z.object({ id: z.string(), name: z.string() })).default([]) })).default([]) });
 const liveSchema = z.object({ liveData: z.array(z.object({ id: z.string(), name: z.string(), entityType: z.string(), status: z.string().optional(), queue: z.record(z.string(), z.object({ waitTime: z.number().nonnegative().optional() })).optional() })).default([]) });
 
-export type ThemeParksStatus = { source: "ThemeParks.wiki"; parkClosed: boolean; rides: Record<string, QueueTimesRideStatus>; ridesByName: Record<string, QueueTimesRideStatus> };
+export type ThemeParksStatus = { source: string; parkClosed: boolean; rides: Record<string, QueueTimesRideStatus>; ridesByName: Record<string, QueueTimesRideStatus> };
 
 function normalize(value: string): string {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -50,5 +51,5 @@ export async function getThemeParksStatus(parkName: string, fetchImpl: ThemePark
     rides[entity.id] = status;
     ridesByName[normalize(entity.name)] = status;
   }
-  return { source: "ThemeParks.wiki", parkClosed: false, rides, ridesByName };
+  return { source: getPublicEnrichmentSource("themeparks-wiki")?.name ?? "ThemeParks.wiki", parkClosed: false, rides, ridesByName };
 }

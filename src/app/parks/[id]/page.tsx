@@ -10,6 +10,7 @@ import { translate } from "@/core/i18n/translations";
 import { getQueueTimesStatus } from "@/core/services/queue-times.service";
 import { getThemeParksStatus } from "@/core/services/themeparks.service";
 import type { ThemeParksStatus } from "@/core/services/themeparks.service";
+import { getPublicEnrichmentSource } from "@/core/services/public-enrichment";
 import { enqueueRideCategoryJobs, recordWaitTimeSnapshots } from "@/core/db/repositories";
 
 export const dynamic = "force-dynamic";
@@ -29,7 +30,7 @@ export default async function ParkDetailPage({ params }: { params: Promise<{ id:
   const queueTimesStatus = await getThemeParksStatus(park.name) ?? (park.externalId ? await getQueueTimesStatus(park.externalId) : null);
   if (queueTimesStatus) {
     const themeParksStatus = "ridesByName" in queueTimesStatus ? queueTimesStatus as ThemeParksStatus : null;
-    const source = themeParksStatus?.source ?? "Queue-Times";
+    const source = themeParksStatus?.source ?? getPublicEnrichmentSource("queue-times")?.name ?? "Queue-Times";
     recordWaitTimeSnapshots(park.rides.flatMap((ride) => {
       const status = (ride.externalId ? queueTimesStatus.rides[ride.externalId] : undefined) ?? (themeParksStatus?.ridesByName[normalizeRideName(ride.name)]);
       return status ? [{ rideId: ride.id, source, waitMinutes: status.waitTime, isOpen: status.isOpen }] : [];

@@ -213,6 +213,8 @@ Park and attraction data is assembled progressively from explicit source adapter
 
 Source URLs are retained where applicable and live-status attribution is shown in the park inventory. Providers are queried through fail-soft adapters; unsupported or rate-limited sources do not block catalog usage.
 
+These providers are **public enrichment sources**, not personal-history import sources. They can supply park metadata or current operating/wait information, but they never receive RideTracker account credentials and never create historical visits or ride logs from a closed external account. Personal history enters through the authenticated CSV/JSON Import Center described above.
+
 ### Mobile and offline mode
 
 RideTracker is installable as a PWA and registers a service worker for the application shell. The in-park check-in flow is designed to remain useful when connectivity is unreliable:
