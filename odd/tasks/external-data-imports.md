@@ -28,7 +28,7 @@ Checks: focused tests, full test suite, typecheck, lint, build, and documentatio
 
 - T1 (S1-S3): Define source-agnostic import contracts, normalized identity matching, and a validated preview/apply service. Route: inline. Status: complete; focused importer tests, typecheck, and lint green. Commit: 5e8143e.
 - T2 (S1-S3): Add the authenticated import UI/API and persistence transaction with duplicate reporting. Route: inline. Status: complete; `/import`, `/api/import`, preview/apply flow, ownership, and duplicate handling implemented. Commit: 5e8143e.
-- T3 (S2-S3): Add source metadata and public-enrichment connector boundaries without importing closed-account data. Route: inline. Status: complete; added a registry for Queue-Times and ThemeParks.wiki, wired attribution through the registry, and documented the boundary between enrichment and personal imports. Commit: pending.
+- T3 (S2-S3): Add source metadata and public-enrichment connector boundaries without importing closed-account data. Route: inline. Status: complete; added a registry for Queue-Times and ThemeParks.wiki, wired attribution through the registry, and documented the boundary between enrichment and personal imports. Commit: c33c6cd.
 - T4 (S1-S3): Add user documentation and complete verification. Route: inline. Status: complete; README updated; 47 tests, typecheck, lint, build, and diff check green. Commit: 5e8143e.
 
 ## Log
