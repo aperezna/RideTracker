@@ -145,7 +145,20 @@ Con la sesión iniciada, puedes descargar tus datos desde:
 
 Las exportaciones están limitadas a los datos de la cuenta autenticada.
 
-### 8. Idioma y privacidad
+### 8. Importar historial desde otra aplicación
+
+RideTracker incluye **Importar** en la navegación principal para cargar historiales desde archivos CSV o JSON controlados por el usuario.
+
+1. Prepara un archivo con estas cabeceras: `park_name`, `ride_name`, `visit_date`, `country`, `city`, `latitude`, `longitude`, `laps`, `status`, `rating`, `notes`.
+2. `park_name`, `ride_name` y `visit_date` son obligatorios.
+3. Para un parque nuevo también son obligatorios `country`, `city`, `latitude` y `longitude`.
+4. Abre **Importar**, selecciona el archivo y pulsa **Previsualizar**.
+5. Revisa los parques, atracciones, visitas, check-ins, duplicados y errores detectados.
+6. Pulsa **Aplicar importación** solo cuando el resumen sea correcto.
+
+La importación es privada para la cuenta autenticada, se ejecuta en una transacción y no sobrescribe valoraciones existentes. Las filas repetidas se detectan y se muestran como duplicados. No se utilizan credenciales ni scraping de aplicaciones externas.
+
+### 9. Idioma y privacidad
 
 - Cambia el idioma desde el selector de la navegación superior.
 - Cierra la sesión al utilizar un dispositivo compartido.
