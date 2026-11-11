@@ -11,6 +11,7 @@ import { getQueueTimesStatus } from "@/core/services/queue-times.service";
 import { getThemeParksStatus } from "@/core/services/themeparks.service";
 import type { ThemeParksStatus } from "@/core/services/themeparks.service";
 import { getPublicEnrichmentSource } from "@/core/services/public-enrichment";
+import { ParkEnrichmentStatus } from "@/components/features/parks/ParkEnrichmentStatus";
 import { enqueueRideCategoryJobs, recordWaitTimeSnapshots } from "@/core/db/repositories";
 
 export const dynamic = "force-dynamic";
@@ -36,5 +37,6 @@ export default async function ParkDetailPage({ params }: { params: Promise<{ id:
       return status ? [{ rideId: ride.id, source, waitMinutes: status.waitTime, isOpen: status.isOpen }] : [];
     }), userId);
   }
-  return <main className="min-h-screen bg-[#0f131d] px-4 py-6 text-slate-100 sm:px-8 lg:px-12"><div className="mx-auto max-w-7xl"><Link href="/parks" className="text-sm text-slate-400 hover:text-amber-200">{translate(locale, "parks.back")}</Link><div className="mt-5"><ParkHeroHeader park={park} /></div><div className="mt-6 grid gap-6 xl:grid-cols-[1.4fr_0.8fr]"><RideInventoryTable parkId={park.id} rides={park.rides} queueTimesStatus={queueTimesStatus} /><VisitHistoryTimeline visits={park.visits} /></div></div></main>;
+  const enrichmentSource = queueTimesStatus && "source" in queueTimesStatus && typeof queueTimesStatus.source === "string" ? queueTimesStatus.source : queueTimesStatus ? getPublicEnrichmentSource("queue-times")?.name ?? "Queue-Times" : null;
+  return <main className="min-h-screen bg-[#0f131d] px-4 py-6 text-slate-100 sm:px-8 lg:px-12"><div className="mx-auto max-w-7xl"><Link href="/parks" className="text-sm text-slate-400 hover:text-amber-200">{translate(locale, "parks.back")}</Link><div className="mt-5"><ParkHeroHeader park={park} /></div><div className="mt-6"><ParkEnrichmentStatus source={enrichmentSource} parkClosed={queueTimesStatus?.parkClosed ?? null} rideCount={queueTimesStatus ? Object.keys(queueTimesStatus.rides).length : 0} /></div><div className="mt-6 grid gap-6 xl:grid-cols-[1.4fr_0.8fr]"><RideInventoryTable parkId={park.id} rides={park.rides} queueTimesStatus={queueTimesStatus} /><VisitHistoryTimeline visits={park.visits} /></div></div></main>;
 }
