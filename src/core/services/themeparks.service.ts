@@ -4,13 +4,23 @@ import type { QueueTimesRideStatus } from "./queue-times.service";
 import { getPublicEnrichmentSource } from "./public-enrichment";
 
 const BASE_URL = "https://api.themeparks.wiki/v1";
+const MAX_LIVE_DATA_AGE_MS = 30 * 60_000;
+const MAX_FUTURE_SKEW_MS = 5 * 60_000;
 const destinationsSchema = z.object({ destinations: z.array(z.object({ parks: z.array(z.object({ id: z.string(), name: z.string() })).default([]) })).default([]) });
-const liveSchema = z.object({ liveData: z.array(z.object({ id: z.string(), name: z.string(), entityType: z.string(), status: z.string().optional(), queue: z.record(z.string(), z.object({ waitTime: z.number().nonnegative().optional() })).optional() })).default([]) });
+const liveSchema = z.object({ liveData: z.array(z.object({ id: z.string(), name: z.string(), entityType: z.string(), status: z.string().optional(), lastUpdated: z.string().optional(), queue: z.record(z.string(), z.object({ waitTime: z.number().nonnegative().optional() })).optional() })).default([]) });
 
 export type ThemeParksStatus = { source: string; parkClosed: boolean; rides: Record<string, QueueTimesRideStatus>; ridesByName: Record<string, QueueTimesRideStatus> };
 
 function normalize(value: string): string {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
+}
+
+function isCurrent(lastUpdated: string | undefined, now = Date.now()): boolean {
+  if (!lastUpdated) return true;
+  const timestamp = Date.parse(lastUpdated);
+  if (Number.isNaN(timestamp)) return false;
+  const age = now - timestamp;
+  return age <= MAX_LIVE_DATA_AGE_MS && age >= -MAX_FUTURE_SKEW_MS;
 }
 
 function createTimeoutSignal(): { signal: AbortSignal; cancel: () => void } {
@@ -46,10 +56,12 @@ export async function getThemeParksStatus(parkName: string, fetchImpl: ThemePark
   const rides: Record<string, QueueTimesRideStatus> = {};
   const ridesByName: Record<string, QueueTimesRideStatus> = {};
   for (const entity of live.data.liveData.filter((item) => item.entityType === "ATTRACTION")) {
-    const isOpen = entity.status === "OPERATING" ? true : entity.status === "DOWN" || entity.status === "CLOSED" || entity.status === "REFURBISHMENT" ? false : null;
-    const status = { isOpen, waitTime: entity.queue?.STANDBY?.waitTime ?? null };
+    const current = isCurrent(entity.lastUpdated);
+    const isOpen = !current ? null : entity.status === "OPERATING" ? true : entity.status === "DOWN" || entity.status === "CLOSED" || entity.status === "REFURBISHMENT" ? false : null;
+    const status = { isOpen, waitTime: !current ? null : entity.queue?.STANDBY?.waitTime ?? null };
     rides[entity.id] = status;
     ridesByName[normalize(entity.name)] = status;
   }
-  return { source: getPublicEnrichmentSource("themeparks-wiki")?.name ?? "ThemeParks.wiki", parkClosed: false, rides, ridesByName };
+  const knownOpenStates = Object.values(rides).map((ride) => ride.isOpen).filter((isOpen): isOpen is boolean => isOpen !== null);
+  return { source: getPublicEnrichmentSource("themeparks-wiki")?.name ?? "ThemeParks.wiki", parkClosed: knownOpenStates.length > 0 && knownOpenStates.every((isOpen) => !isOpen), rides, ridesByName };
 }
