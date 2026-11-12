@@ -4,7 +4,7 @@ import { deleteParkRecord } from "@/core/db/repositories";
 import { parks, rideAliases, rideFieldSources, rideLogs, rides, users, visitDays, waitTimeObservations } from "@/core/db/schema";
 import { calculateTopTen, calculateUniqueCoasterCount } from "@/core/domain/coaster-stats";
 import { transitionParkStatusOnFirstVisit } from "@/core/domain/coaster-stats";
-import { getParkCatalogData } from "@/core/db/parks";
+import { getParkCatalogData, getRideWaitTimeHistory } from "@/core/db/parks";
 import { getDashboardData } from "@/core/db/dashboard";
 
 function createSchema(connection: ReturnType<typeof createDatabase>): void {
@@ -126,6 +126,32 @@ describe("Iteration 2 SQLite persistence", () => {
 
     expect(dashboard.parks).toEqual([{ id: "park-1", name: "Efteling", country: "NL", latitude: 51.650278, longitude: 5.048056, status: "VISITED" }]);
     expect(dashboard.totalLaps).toBe(1);
+    connection.client.close();
+  });
+
+  it("returns wait-time history only for the requesting user's ride", () => {
+    const connection = createDatabase(":memory:");
+    createSchema(connection);
+    const createdAt = new Date("2026-12-30T00:00:00.000Z");
+    connection.db.insert(users).values([
+      { id: "user-1", email: "one@example.com", passwordHash: "hash", createdAt },
+      { id: "user-2", email: "two@example.com", passwordHash: "hash", createdAt },
+    ]).run();
+    connection.db.insert(parks).values([
+      { id: "park-1", userId: "user-1", name: "Private One", country: "DE", city: "Brühl", latitude: 50, longitude: 7, status: "VISITED", createdAt },
+      { id: "park-2", userId: "user-2", name: "Private Two", country: "US", city: "Orlando", latitude: 28, longitude: -81, status: "PLANNED", createdAt },
+    ]).run();
+    connection.db.insert(rides).values([
+      { id: "ride-1", parkId: "park-1", name: "Coaster", category: "COASTER" },
+      { id: "ride-2", parkId: "park-2", name: "Other Coaster", category: "COASTER" },
+    ]).run();
+    connection.db.insert(waitTimeObservations).values([
+      { id: "wait-1", rideId: "ride-1", source: "test", waitMinutes: 25, isOpen: true, observedAt: createdAt },
+      { id: "wait-2", rideId: "ride-2", source: "test", waitMinutes: 40, isOpen: true, observedAt: createdAt },
+    ]).run();
+
+    expect(getRideWaitTimeHistory("park-1", "ride-1", "user-1", 24, connection.db)).toHaveLength(1);
+    expect(getRideWaitTimeHistory("park-2", "ride-2", "user-1", 24, connection.db)).toEqual([]);
     connection.client.close();
   });
 

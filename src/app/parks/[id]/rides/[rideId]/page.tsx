@@ -1,15 +1,17 @@
 import { notFound } from "next/navigation";
 import { getRequestLocale } from "@/core/i18n/server";
-import { getRideDetailData } from "@/core/db/parks";
+import { getRideDetailData, getRideWaitTimeHistory } from "@/core/db/parks";
 import { requireCurrentUserId } from "@/core/auth/current-user";
 import { getRideEnrichment, translateEnrichmentText } from "@/core/services/wikimedia.service";
 import { RideDetailCard } from "@/components/features/rides/RideDetailCard";
+import { WaitTimeHistory } from "@/components/features/rides/WaitTimeHistory";
 
 export const dynamic = "force-dynamic";
 
 export default async function RideDetailPage({ params }: { params: Promise<{ id: string; rideId: string }> }) {
   const { id, rideId } = await params;
-  const ride = getRideDetailData(id, rideId, await requireCurrentUserId());
+  const userId = await requireCurrentUserId();
+  const ride = getRideDetailData(id, rideId, userId);
   if (!ride) notFound();
   const locale = await getRequestLocale();
   const liveEnrichment = await getRideEnrichment(ride.name, ride.parkName, locale);
@@ -30,5 +32,6 @@ export default async function RideDetailPage({ params }: { params: Promise<{ id:
     manufacturer: null,
     category: null,
   } : null;
-  return <RideDetailCard ride={ride} enrichment={enrichment} />;
+  const waitTimeHistory = getRideWaitTimeHistory(id, rideId, userId);
+  return <><RideDetailCard ride={ride} enrichment={enrichment} /><WaitTimeHistory observations={waitTimeHistory} /></>;
 }

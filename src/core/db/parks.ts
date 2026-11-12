@@ -2,7 +2,7 @@ import { and, desc, eq } from "drizzle-orm";
 
 import type { ParkDetailData, ParkCardData, RideDetailData } from "../domain/park-views";
 import { db } from "./index";
-import { parks, rideAliases, rideFieldSources, rideLogs, rides, visitDays } from "./schema";
+import { parks, rideAliases, rideFieldSources, rideLogs, rides, visitDays, waitTimeObservations } from "./schema";
 
 export function getParkCatalogData(userId: string, database: typeof db = db): ParkCardData[] {
   const parkRows = database.select().from(parks).where(eq(parks.userId, userId)).orderBy(desc(parks.createdAt)).all();
@@ -114,4 +114,27 @@ export function getRideDetailData(parkId: string, rideId: string, userId: string
     totalTrips: logs.length,
     totalLaps: logs.reduce((sum, log) => sum + log.lapCount, 0),
   };
+}
+
+export type WaitTimeHistoryPoint = {
+  source: string;
+  waitMinutes: number | null;
+  isOpen: boolean | null;
+  observedAt: Date;
+};
+
+export function getRideWaitTimeHistory(parkId: string, rideId: string, userId: string, limit = 24, database: typeof db = db): WaitTimeHistoryPoint[] {
+  const ownedRide = database.select({ id: rides.id })
+    .from(rides)
+    .innerJoin(parks, eq(parks.id, rides.parkId))
+    .where(and(eq(rides.id, rideId), eq(rides.parkId, parkId), eq(parks.userId, userId)))
+    .get();
+  if (!ownedRide) return [];
+  return database.select({ source: waitTimeObservations.source, waitMinutes: waitTimeObservations.waitMinutes, isOpen: waitTimeObservations.isOpen, observedAt: waitTimeObservations.observedAt })
+    .from(waitTimeObservations)
+    .where(eq(waitTimeObservations.rideId, rideId))
+    .orderBy(desc(waitTimeObservations.observedAt))
+    .limit(limit)
+    .all()
+    .reverse();
 }
