@@ -31,7 +31,7 @@ Checks: focused tests, full test suite, typecheck, lint, build, and documentatio
 - T3 (S2-S3): Add source metadata and public-enrichment connector boundaries without importing closed-account data. Route: inline. Status: complete; added a registry for Queue-Times and ThemeParks.wiki, wired attribution through the registry, and documented the boundary between enrichment and personal imports. Commit: c33c6cd.
 - T4 (S1-S3): Add user documentation and complete verification. Route: inline. Status: complete; README updated; 47 tests, typecheck, lint, build, and diff check green. Commit: 5e8143e.
 - T5 (S2-S3): Show public enrichment state and provider attribution on park detail pages. Route: inline. Status: complete; added available/closed/unavailable states, source, signal count, and public-only boundary copy in English and Spanish. Commit: 5748510.
-- T6 (S2-S3): Add unattended, deduplicated public wait-time polling to the background worker. Route: inline. Status: complete; worker polls every 10 minutes, deduplicates provider requests, records ownership-scoped observations, and local Docker verified 79 observations across 2 targets. Commit: pending.
+- T6 (S2-S3): Add unattended, deduplicated public wait-time polling to the background worker. Route: inline. Status: complete; worker polls every 10 minutes, deduplicates provider requests, records ownership-scoped observations, and local Docker verified 79 observations across 2 targets. Commit: 97bacb1.
 
 ## Log
 
