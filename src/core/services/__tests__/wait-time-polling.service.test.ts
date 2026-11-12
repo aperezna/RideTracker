@@ -39,4 +39,20 @@ describe("wait-time polling", () => {
 
     expect(getQueueTimesStatus).toHaveBeenCalledTimes(1);
   });
+
+  it("respects provider cooldowns before retrying a failed source", async () => {
+    const getThemeParksStatus = vi.fn();
+    const getQueueTimesStatus = vi.fn();
+    const isEnrichmentCoolingDown = vi.fn().mockReturnValue(true);
+
+    await expect(pollWaitTimeObservations([target("user-1")], {
+      getThemeParksStatus,
+      getQueueTimesStatus,
+      recordWaitTimeSnapshots: vi.fn(),
+      isEnrichmentCoolingDown,
+    })).resolves.toEqual({ targets: 1, observations: 0 });
+
+    expect(getThemeParksStatus).not.toHaveBeenCalled();
+    expect(getQueueTimesStatus).not.toHaveBeenCalled();
+  });
 });

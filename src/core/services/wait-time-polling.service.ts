@@ -1,5 +1,5 @@
 import type { WaitTimePollingTarget, WaitTimeSnapshot } from "@/core/db/repositories";
-import { recordWaitTimeSnapshots } from "@/core/db/repositories";
+import { clearEnrichmentFailure, isEnrichmentCoolingDown, recordEnrichmentFailure, recordWaitTimeSnapshots } from "@/core/db/repositories";
 import { getQueueTimesStatus, type QueueTimesStatus } from "./queue-times.service";
 import { getThemeParksStatus, type ThemeParksStatus } from "./themeparks.service";
 
@@ -11,9 +11,12 @@ export type WaitTimePollingDependencies = {
   getThemeParksStatus: ThemeStatusFetcher;
   getQueueTimesStatus: QueueStatusFetcher;
   recordWaitTimeSnapshots: typeof recordWaitTimeSnapshots;
+  isEnrichmentCoolingDown?: typeof isEnrichmentCoolingDown;
+  recordEnrichmentFailure?: typeof recordEnrichmentFailure;
+  clearEnrichmentFailure?: typeof clearEnrichmentFailure;
 };
 
-const defaultDependencies: WaitTimePollingDependencies = { getThemeParksStatus, getQueueTimesStatus, recordWaitTimeSnapshots };
+const defaultDependencies: WaitTimePollingDependencies = { getThemeParksStatus, getQueueTimesStatus, recordWaitTimeSnapshots, isEnrichmentCoolingDown, recordEnrichmentFailure, clearEnrichmentFailure };
 
 function normalizeRideName(value: string): string {
   return value.normalize("NFD").replace(/[\u0300-\u036f]/g, "").toLowerCase().replace(/[^a-z0-9]+/g, " ").trim();
@@ -33,13 +36,24 @@ export async function pollWaitTimeObservations(targets: WaitTimePollingTarget[],
   let observations = 0;
   for (const target of targets) {
     const themeKey = target.externalId ?? target.parkName.trim().toLowerCase();
-    const themePromise = themeStatuses.get(themeKey) ?? dependencies.getThemeParksStatus(target.parkName);
-    themeStatuses.set(themeKey, themePromise);
-    let status: PollingStatus | null = await themePromise;
+    const themeSource = "wait-time-themeparks";
+    let status: PollingStatus | null = null;
+    if (!dependencies.isEnrichmentCoolingDown?.(themeSource, themeKey)) {
+      const themePromise = themeStatuses.get(themeKey) ?? dependencies.getThemeParksStatus(target.parkName);
+      themeStatuses.set(themeKey, themePromise);
+      status = await themePromise;
+      if (status) dependencies.clearEnrichmentFailure?.(themeSource, themeKey);
+      else dependencies.recordEnrichmentFailure?.(themeSource, themeKey, "No ThemeParks.wiki live status available");
+    }
     if (!status && target.externalId) {
-      const queuePromise = queueStatuses.get(target.externalId) ?? dependencies.getQueueTimesStatus(target.externalId);
-      queueStatuses.set(target.externalId, queuePromise);
-      status = await queuePromise;
+      const queueSource = "wait-time-queue-times";
+      if (!dependencies.isEnrichmentCoolingDown?.(queueSource, target.externalId)) {
+        const queuePromise = queueStatuses.get(target.externalId) ?? dependencies.getQueueTimesStatus(target.externalId);
+        queueStatuses.set(target.externalId, queuePromise);
+        status = await queuePromise;
+        if (status) dependencies.clearEnrichmentFailure?.(queueSource, target.externalId);
+        else dependencies.recordEnrichmentFailure?.(queueSource, target.externalId, "No Queue-Times live status available");
+      }
     }
     if (!status) continue;
     const snapshots = snapshotsForTarget(target, status);
