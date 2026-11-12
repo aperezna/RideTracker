@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { createDatabase } from "@/core/db";
-import { deleteParkRecord } from "@/core/db/repositories";
+import { deleteParkRecord, getWaitTimePollingTargets } from "@/core/db/repositories";
 import { parks, rideAliases, rideFieldSources, rideLogs, rides, users, visitDays, waitTimeObservations } from "@/core/db/schema";
 import { calculateTopTen, calculateUniqueCoasterCount } from "@/core/domain/coaster-stats";
 import { transitionParkStatusOnFirstVisit } from "@/core/domain/coaster-stats";
@@ -152,6 +152,21 @@ describe("Iteration 2 SQLite persistence", () => {
 
     expect(getRideWaitTimeHistory("park-1", "ride-1", "user-1", 24, connection.db)).toHaveLength(1);
     expect(getRideWaitTimeHistory("park-2", "ride-2", "user-1", 24, connection.db)).toEqual([]);
+    connection.client.close();
+  });
+
+  it("builds polling targets only from owned parks with rides", () => {
+    const connection = createDatabase(":memory:");
+    createSchema(connection);
+    const createdAt = new Date("2026-12-30T00:00:00.000Z");
+    connection.db.insert(users).values({ id: "user-1", email: "one@example.com", passwordHash: "hash", createdAt }).run();
+    connection.db.insert(parks).values([
+      { id: "park-1", userId: "user-1", name: "Efteling", country: "NL", city: "Kaatsheuvel", latitude: 51, longitude: 5, status: "VISITED", externalId: "123", createdAt },
+      { id: "park-empty", userId: "user-1", name: "Empty", country: "NL", city: "Kaatsheuvel", latitude: 51, longitude: 5, status: "WISHLIST", createdAt },
+    ]).run();
+    connection.db.insert(rides).values({ id: "ride-1", parkId: "park-1", name: "Baron 1898", category: "COASTER", externalId: "ride-1" }).run();
+
+    expect(getWaitTimePollingTargets(connection.db)).toEqual([{ userId: "user-1", parkId: "park-1", parkName: "Efteling", externalId: "123", rides: [{ id: "ride-1", externalId: "ride-1", name: "Baron 1898" }] }]);
     connection.client.close();
   });
 

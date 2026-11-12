@@ -123,7 +123,7 @@ export type WaitTimeHistoryPoint = {
   observedAt: Date;
 };
 
-export function getRideWaitTimeHistory(parkId: string, rideId: string, userId: string, limit = 24, database: typeof db = db): WaitTimeHistoryPoint[] {
+export function getRideWaitTimeHistory(parkId: string, rideId: string, userId: string, limit = 100, database: typeof db = db): WaitTimeHistoryPoint[] {
   const ownedRide = database.select({ id: rides.id })
     .from(rides)
     .innerJoin(parks, eq(parks.id, rides.parkId))

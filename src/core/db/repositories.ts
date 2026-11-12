@@ -325,6 +325,24 @@ export function createRideLogRecord(log: RideLogRecord, userId: string): void {
 
 export type WaitTimeSnapshot = Pick<WaitTimeObservationRecord, "rideId" | "source" | "waitMinutes" | "isOpen">;
 
+export type WaitTimePollingTarget = {
+  userId: string;
+  parkId: string;
+  parkName: string;
+  externalId: string | null;
+  rides: Array<{ id: string; externalId: string | null; name: string }>;
+};
+
+export function getWaitTimePollingTargets(database: typeof db = db): WaitTimePollingTarget[] {
+  const parkRows = database.select({ id: parks.id, userId: parks.userId, name: parks.name, externalId: parks.externalId }).from(parks).all();
+  const rideRows = database.select({ id: rides.id, parkId: rides.parkId, externalId: rides.externalId, name: rides.name }).from(rides).all();
+  const ridesByPark = new Map<string, WaitTimePollingTarget["rides"]>();
+  for (const ride of rideRows) ridesByPark.set(ride.parkId, [...(ridesByPark.get(ride.parkId) ?? []), { id: ride.id, externalId: ride.externalId, name: ride.name }]);
+  return parkRows
+    .filter((park): park is typeof park & { userId: string } => Boolean(park.userId) && (ridesByPark.get(park.id)?.length ?? 0) > 0)
+    .map((park) => ({ userId: park.userId, parkId: park.id, parkName: park.name, externalId: park.externalId, rides: ridesByPark.get(park.id) ?? [] }));
+}
+
 export function recordWaitTimeSnapshots(snapshots: WaitTimeSnapshot[], userId: string, observedAt = new Date()): void {
   const recentThreshold = new Date(observedAt.getTime() - 5 * 60_000);
   db.transaction((transaction) => {

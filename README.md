@@ -35,6 +35,8 @@ The Compose stack runs two services:
 - `ridetracker` — Next.js web application on port `3000`.
 - `enrichment-worker` — independent SQLite-backed worker for attraction metadata, photos, descriptions, and storytelling.
 
+The background worker also polls public live-wait providers every 10 minutes for parks that have catalogued rides. Requests are deduplicated by public park identity, then observations are recorded against each owned park so wait-time history does not depend on a user opening the park page.
+
 Both services run inside the container as the non-root user `nextjs` (UID 1001). SQLite data is persisted in the repository's `data/` directory.
 
 ### Stop the application
