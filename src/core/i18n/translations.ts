@@ -27,6 +27,14 @@ const messages = {
     "import.summary": "Import preview",
     "import.errors": "Validation errors",
     "import.duplicates": "Duplicates",
+    "import.failed": "Import failed. Please try again.",
+    "import.validationFailed": "The import contains validation errors.",
+    "import.summaryParks": "Parks",
+    "import.summaryRides": "Rides",
+    "import.summaryVisitDays": "Visit days",
+    "import.summaryRideLogs": "Ride logs",
+    "import.summaryDuplicates": "Duplicates",
+    "import.rowCountryRequired": "Row {row}: country is required because multiple parks have this name.",
     "metadata.description": "Personal theme park and ride tracker",
     "metadata.manifestName": "RideTracker — Theme Park & Ride Tracker",
     "metadata.manifestDescription": "Track theme parks, ride check-ins, laps, ratings, and visit notes.",
@@ -170,8 +178,12 @@ const messages = {
     "parks.enrichmentSource": "Source",
     "parks.enrichmentNoSource": "No provider response",
     "parks.enrichmentSignals": "Signals",
+    "parks.enrichmentUpdated": "Last updated",
+    "parks.enrichmentNoUpdate": "Not available",
     "parks.enrichmentBoundary": "Data boundary",
     "parks.enrichmentPublicOnly": "Public data only",
+    "parks.refreshEnrichment": "Refresh live data",
+    "parks.refreshingEnrichment": "Refreshing…",
     "ride.details": "Attraction details",
     "ride.storytelling": "Storytelling",
     "ride.experience": "What the attraction is about",
@@ -287,6 +299,14 @@ const messages = {
     "import.summary": "Vista previa de importación",
     "import.errors": "Errores de validación",
     "import.duplicates": "Duplicados",
+    "import.failed": "La importación falló. Volvé a intentarlo.",
+    "import.validationFailed": "La importación contiene errores de validación.",
+    "import.summaryParks": "Parques",
+    "import.summaryRides": "Atracciones",
+    "import.summaryVisitDays": "Días de visita",
+    "import.summaryRideLogs": "Registros de atracciones",
+    "import.summaryDuplicates": "Duplicados",
+    "import.rowCountryRequired": "Fila {row}: el país es obligatorio porque hay varios parques con este nombre.",
     "metadata.description": "Tu aplicación personal para registrar parques y atracciones",
     "metadata.manifestName": "RideTracker — Registro de parques y atracciones",
     "metadata.manifestDescription": "Registra parques, atracciones, vueltas, valoraciones y notas de visita.",
@@ -430,8 +450,12 @@ const messages = {
     "parks.enrichmentSource": "Fuente",
     "parks.enrichmentNoSource": "Sin respuesta del proveedor",
     "parks.enrichmentSignals": "Señales",
+    "parks.enrichmentUpdated": "Última actualización",
+    "parks.enrichmentNoUpdate": "No disponible",
     "parks.enrichmentBoundary": "Límite de datos",
     "parks.enrichmentPublicOnly": "Solo datos públicos",
+    "parks.refreshEnrichment": "Actualizar datos actuales",
+    "parks.refreshingEnrichment": "Actualizando…",
     "ride.details": "Detalle de la atracción",
     "ride.storytelling": "Historia de la atracción",
     "ride.experience": "De qué va la atracción",
@@ -554,6 +578,17 @@ export function categoryTranslationKey(category: string): TranslationKey {
     UNKNOWN: "category.unknown",
   };
   return keys[category] ?? "category.flatRide";
+}
+
+export function preferredRowLabel(locale: Locale, value: string | null | undefined): string {
+  if (!value) return translate(locale, "dashboard.noPreferredRow");
+  const keys: Record<string, TranslationKey> = {
+    "Front Row": "visits.frontRow",
+    "Back Row": "visits.backRow",
+    Middle: "visits.middleRow",
+    Custom: "visits.customRow",
+  };
+  return keys[value] ? translate(locale, keys[value]) : value;
 }
 
 export function translateError(locale: Locale, error: unknown, fallback: TranslationKey): string {

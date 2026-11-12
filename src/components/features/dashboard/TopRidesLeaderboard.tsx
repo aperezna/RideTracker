@@ -2,7 +2,7 @@ import { Medal, Star } from "lucide-react";
 
 import type { TopRideRow } from "@/core/domain/dashboard-stats";
 import { getRequestLocale } from "@/core/i18n/server";
-import { categoryTranslationKey, translate, type Locale } from "@/core/i18n/translations";
+import { categoryTranslationKey, preferredRowLabel, translate, type Locale } from "@/core/i18n/translations";
 
 type TopRidesLeaderboardProps = { rides: TopRideRow[]; locale?: Locale };
 
@@ -30,7 +30,7 @@ export async function TopRidesLeaderboard({ rides, locale: providedLocale }: Top
             </div>
             <div className="flex shrink-0 flex-col items-end gap-1 text-xs">
               <span className="rounded-full bg-slate-800 px-2 py-1 font-semibold text-cyan-300">×{ride.totalLaps}</span>
-               <span className="max-w-24 truncate rounded-full bg-amber-400/10 px-2 py-1 text-amber-200" title={ride.preferredRow ?? translate(locale, "dashboard.noPreferredRow")}>{ride.preferredRow ?? translate(locale, "dashboard.rowFallback")}</span>
+                <span className="max-w-24 truncate rounded-full bg-amber-400/10 px-2 py-1 text-amber-200" title={preferredRowLabel(locale, ride.preferredRow)}>{preferredRowLabel(locale, ride.preferredRow)}</span>
             </div>
           </article>
         ))}

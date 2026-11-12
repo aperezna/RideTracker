@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { resolveLocale } from "../server";
-import { translate } from "../translations";
+import { preferredRowLabel, translate } from "../translations";
 
 describe("locale resolution", () => {
   it("prefers a valid cookie over the browser language", () => {
@@ -20,5 +20,11 @@ describe("translations", () => {
   it("translates interpolated messages in both supported locales", () => {
     expect(translate("en", "dashboard.marked", { count: 3 })).toBe("3 marked");
     expect(translate("es", "dashboard.marked", { count: 3 })).toBe("3 marcados");
+  });
+
+  it("translates stored preferred-row values without changing custom values", () => {
+    expect(preferredRowLabel("es", "Front Row")).toBe("Primera fila");
+    expect(preferredRowLabel("es", "Balcony")).toBe("Balcony");
+    expect(preferredRowLabel("es", null)).toBe("Sin fila preferida");
   });
 });
